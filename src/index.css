@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light: paleta de papel quente. Fundo levemente mais profundo para que os
+       cards (off-white morno) se destaquem por elevação, não por contraste alto. */
+    --bg: #ECE6D8;
+    --bg-subtle: #F2EDE1;
+    --surface: #FBF8F2;
+    --surface2: #F1ECE0;
+    --border: #DED7C6;
+    --border-subtle: #E8E2D4;
+    --text-primary: #221f1a;
+    --text-secondary: #4a463d;
+    --text-muted: #6e695a;
+    /* Sidebar morna e escura (menos contraste contra o papel do que o quase-preto) */
+    --sidebar-bg: #2A2622;
+    /* Linhas internas da sidebar: clareamento mínimo sobre o fundo (bem sutil) */
+    --sidebar-border: rgba(255, 255, 255, 0.07);
+    --card-shadow: 0 1px 2px rgba(40,32,16,.04), 0 2px 6px rgba(40,32,16,.05);
+    /* Chips de seleção (popups de criação) */
+    --chip-hover: #E7E0CF;
+    --chip-active-text: #7F3BC1;
+    /* "Papel quente" (estado sem atividades). No light é um pouco mais escuro p/ leitura. */
+    --papel-quente: #A8895A;
+    --papel-quente-soft: rgba(168, 137, 90, 0.16);
+    --papel-quente-tint: rgba(168, 137, 90, 0.24);
+  }
+
+  .dark {
+    --bg: #161719;
+    --bg-subtle: #1C1D20;
+    --surface: #232429;
+    --surface2: #2C2D34;
+    --border: #2F3037;
+    --border-subtle: #212228;
+    /* Texto mais vibrante no dark para facilitar a leitura (apenas cor) */
+    --text-primary: #f6f6f9;
+    --text-secondary: #c9c9d3;
+    --text-muted: #9a9aa6;
+    --sidebar-bg: #0E0F11;
+    --sidebar-border: rgba(255, 255, 255, 0.06);
+    --card-shadow: 0 1px 2px rgba(0,0,0,.2), 0 2px 6px rgba(0,0,0,.18);
+    --chip-hover: #15161A;
+    --chip-active-text: #CFAAFB;
+    /* No dark a cor de papel quente permanece como estava. */
+    --papel-quente: #C2A878;
+    --papel-quente-soft: rgba(194, 168, 120, 0.12);
+    --papel-quente-tint: rgba(194, 168, 120, 0.20);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Geist', 'Space Grotesk', system-ui, sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  ::selection {
+    background: #8637CC33;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  /* Tipografia numérica: Geist com cifras tabulares — limpa e alinhada,
+     usada em datas e métricas (substitui a mono nesses pontos). */
+  .font-num {
+    font-family: 'Geist', 'Space Grotesk', system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'cv01' 1;
+    letter-spacing: -0.01em;
+  }
+
+  /* Chip de seleção dos popups de criação.
+     Repouso: contorno sutil. Hover: fundo destacado (sempre mais escuro que o
+     fundo do popup, nunca mais claro) + contorno roxo. Marcado: roxo ativo. */
+  .chip {
+    border: 1px solid var(--border);
+    background-color: transparent;
+    color: var(--text-muted);
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .chip:hover:not(.chip-selected):not(:disabled) {
+    border-color: #8637CC;
+    background-color: var(--chip-hover);
+    color: var(--text-primary);
+  }
+  .chip-selected {
+    border-color: #8637CC;
+    background-color: rgba(134, 55, 204, 0.12);
+    color: var(--chip-active-text);
+    box-shadow: 0 0 14px rgba(134, 55, 204, 0.42);
+  }
+  .chip:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .text-display {
+    font-family: 'Geist', 'Space Grotesk', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .bg-surface {
+    background-color: var(--surface);
+  }
+
+  .bg-surface2 {
+    background-color: var(--surface2);
+  }
+
+  .bg-app {
+    background-color: var(--bg);
+  }
+
+  .bg-subtle {
+    background-color: var(--bg-subtle);
+  }
+
+  .border-base {
+    border-color: var(--border);
+  }
+
+  /* Card with fixed elevation to separate it from the page background */
+  .card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Interactive card: fixed shadow, hover shifts the border + a left accent (no depth/translate) */
+  .card-interactive {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+  }
+  .card-interactive:hover {
+    border-color: #8637CC;
+    background-color: var(--surface2);
+  }
+
+  .border-subtle {
+    border-color: var(--border-subtle);
+  }
+
+  .text-base-primary {
+    color: var(--text-primary);
+  }
+
+  .text-base-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-base-muted {
+    color: var(--text-muted);
+  }
+}
+
+/* Texto roxo mais vibrante no DARK (apenas cor de texto — não afeta fundos,
+   botões com bg-viper, nem estados disabled). Cobre variantes hover/group-hover. */
+.dark .text-viper-500,
+.dark .text-viper-600 {
+  color: #C49EF8;
+}
+.dark .text-viper-400 {
+  color: #CFAAFB;
+}
+.dark .text-viper-300 {
+  color: #DCC0FC;
+}
+.dark .hover\:text-viper-400:hover,
+.dark .hover\:text-viper-500:hover,
+.dark .group:hover .group-hover\:text-viper-400,
+.dark .group:hover .group-hover\:text-viper-500 {
+  color: #CFAAFB;
+}
+
+/* Task completion animation overlay */
+@keyframes completion-flash {
+  0% { opacity: 0; transform: scale(0.97); }
+  20% { opacity: 1; transform: scale(1.01); }
+  80% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+.task-complete-flash {
+  animation: completion-flash 1s ease-out forwards;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #aaa492;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #837d6c;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2A2B30;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #8637CC;
+}
