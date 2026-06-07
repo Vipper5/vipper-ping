@@ -4,8 +4,6 @@
 
 Aplicação web (SPA) em **React + Vite + TypeScript**, estilizada com **Tailwind CSS** e autenticada via **Supabase**.
 
-🔗 **Produção:** [vipper-ping.vercel.app](https://vipper-ping.vercel.app)
-
 ---
 
 ## ✨ Funcionalidades
