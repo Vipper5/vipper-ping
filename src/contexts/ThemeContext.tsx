@@ -9,7 +9,8 @@ const ThemeContext = createContext<ThemeContextValue>({ dark: false, toggle: () 
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(() => {
-    return localStorage.getItem('vp-theme') === 'dark';
+    // Padrão é dark; só fica claro se o usuário tiver escolhido explicitamente.
+    return localStorage.getItem('vp-theme') !== 'light';
   });
 
   useEffect(() => {
