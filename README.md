@@ -2,7 +2,7 @@
 
 > Painel interno da **VipperDev** para gestão de projetos, atividades, agenda, membros e controle de ponto.
 
-Aplicação web (SPA) em **React + Vite + TypeScript**, estilizada com **Tailwind CSS**, autenticada via **Supabase** e publicada na **Vercel**.
+Aplicação web (SPA) em **React + Vite + TypeScript**, estilizada com **Tailwind CSS** e autenticada via **Supabase**.
 
 🔗 **Produção:** [vipper-ping.vercel.app](https://vipper-ping.vercel.app)
 
@@ -43,7 +43,6 @@ Rotas protegidas por guards (`RequireAuth`, `RequireSocio`, `RequireEstagiario`)
 | Tipografia | Geist (texto) + JetBrains Mono (metadados) |
 | Build | Vite 5 |
 | Auth / dados | Supabase |
-| Deploy | Vercel |
 
 ---
 
@@ -119,7 +118,7 @@ Tokens, componentes e diretrizes completas estão documentados em [DESIGN.md](DE
 
 ## ☁️ Deploy
 
-A aplicação é publicada na Vercel. O build é gerado com `npm run build` e servido a partir de `dist/`. As variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` devem estar configuradas no painel da Vercel.
+O build de produção é gerado com `npm run build` e servido a partir de `dist/` (build estático). Garanta que as variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` estejam configuradas no ambiente de deploy.
 
 ---
 
