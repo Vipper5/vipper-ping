@@ -165,7 +165,8 @@ export function Ponto() {
             </span>
           </div>
 
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
                 <th className="text-left px-4 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Data</th>
@@ -229,6 +230,7 @@ export function Ponto() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </Layout>

@@ -166,7 +166,7 @@ export function ActivityDetail() {
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#15BB77'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
-                <RotateCcw size={14} /> Reverter
+                <RotateCcw size={14} /> <span className="hidden sm:inline">Reverter</span>
               </button>
             ) : task.status === 'em_andamento' ? (
               // Em andamento → concluir (verde, cor do status concluída)
@@ -175,7 +175,7 @@ export function ActivityDetail() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(21,187,119,0.55)]"
                 style={{ backgroundColor: '#15BB77' }}
               >
-                <CheckCircle2 size={14} /> Concluir
+                <CheckCircle2 size={14} /> <span className="hidden sm:inline">Concluir</span>
               </button>
             ) : (
               // Pendente → mover para em andamento (azul, cor do status em andamento)
@@ -184,7 +184,7 @@ export function ActivityDetail() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(82,148,230,0.55)]"
                 style={{ backgroundColor: '#5294E6' }}
               >
-                <Circle size={14} /> Em andamento
+                <Circle size={14} /> <span className="hidden sm:inline">Em andamento</span>
               </button>
             )
           )}
@@ -193,7 +193,7 @@ export function ActivityDetail() {
               onClick={() => setShowDelete(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-danger text-danger bg-transparent transition-all duration-150 hover:bg-danger hover:text-white hover:shadow-[0_0_16px_rgba(229,64,86,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
             >
-              <Trash2 size={14} /> Excluir
+              <Trash2 size={14} /> <span className="hidden sm:inline">Excluir</span>
             </button>
           )}
         </div>

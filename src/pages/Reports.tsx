@@ -180,7 +180,8 @@ export function Reports() {
             Nenhuma task concluída no período selecionado.
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-base" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-subtle)' }}>
                 <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Task</th>
@@ -213,6 +214,7 @@ export function Reports() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </Layout>

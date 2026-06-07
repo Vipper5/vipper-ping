@@ -363,7 +363,7 @@ export function Agenda() {
               <button
                 key={i}
                 onClick={() => openDay(key)}
-                className="group relative text-left min-h-[122px] py-2 pr-2 pl-3 flex flex-col gap-1 border-b border-r transition-colors focus:outline-none"
+                className="group relative text-left min-h-[68px] sm:min-h-[122px] py-1.5 pr-1 pl-2 sm:py-2 sm:pr-2 sm:pl-3 flex flex-col gap-1 border-b border-r transition-colors focus:outline-none"
                 style={{ borderColor: 'var(--border)', backgroundColor: cellBg }}
               >
                 {/* borda lateral colorida com as cores do dia */}
@@ -389,7 +389,17 @@ export function Agenda() {
                   <span className="absolute right-0 opacity-0 group-hover:opacity-100 transition-opacity text-viper-500"><Plus size={13} /></span>
                 </div>
 
-                <div className="relative flex flex-col gap-1 overflow-hidden">
+                {/* Mobile: apenas pontos coloridos (chips de texto não cabem) */}
+                {dItems.length > 0 && (
+                  <div className="relative flex sm:hidden flex-wrap gap-1 mt-0.5">
+                    {dayColors.slice(0, 4).map((c) => (
+                      <span key={c} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Tablet/desktop: chips de texto */}
+                <div className="relative hidden sm:flex flex-col gap-1 overflow-hidden">
                   {shown.map((it) => (
                     <div
                       key={it.id}

@@ -51,7 +51,14 @@ function UserAvatar({ user }: { user: { name: string; initials: string; photo?: 
   );
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  /** No mobile, controla se o drawer está aberto. */
+  open?: boolean;
+  /** Fecha o drawer (mobile). */
+  onClose?: () => void;
+}
+
+export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { user, signOut } = useAuth();
   const { dark, toggle } = useTheme();
   const navigate = useNavigate();
@@ -69,7 +76,9 @@ export function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-56 flex flex-col z-40"
+      className={`fixed left-0 top-0 h-screen w-64 md:w-52 lg:w-56 flex flex-col z-50 transition-transform duration-200 md:translate-x-0 ${
+        open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      }`}
       style={{ backgroundColor: 'var(--sidebar-bg)' }}
     >
       {/* Logo — height matches the page header so the bottom borders align */}
@@ -93,6 +102,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={onClose}
           >
             {({ isActive }) => (
               <div
@@ -136,6 +146,7 @@ export function Sidebar() {
       {user && (
         <Link
           to="/perfil"
+          onClick={onClose}
           className="group flex items-center gap-3 px-4 py-3 border-t hover:bg-carvao-surface1 transition-colors shrink-0"
           style={{ borderColor: 'var(--sidebar-border)' }}
         >

@@ -301,13 +301,13 @@ export function ProjectDetail() {
               onClick={() => setShowDelete(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-danger text-danger bg-transparent transition-all duration-150 hover:bg-danger hover:text-white hover:shadow-[0_0_16px_rgba(229,64,86,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
             >
-              <Trash2 size={14} /> Excluir
+              <Trash2 size={14} /> <span className="hidden sm:inline">Excluir</span>
             </button>
             <button
               onClick={openEdit}
               className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(134,55,204,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-viper-500"
             >
-              <Pencil size={14} /> Editar projeto
+              <Pencil size={14} /> <span className="hidden sm:inline">Editar projeto</span>
             </button>
           </div>
         ) : undefined

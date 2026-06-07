@@ -35,7 +35,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         onClick={onClose}
       />
       <div
-        className={`relative w-full ${widthMap[size]} rounded-xl border border-base bg-surface animate-slide-down`}
+        className={`relative w-full ${widthMap[size]} max-h-[90dvh] overflow-y-auto rounded-xl border border-base bg-surface animate-slide-down`}
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border)',
