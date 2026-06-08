@@ -9,6 +9,7 @@ import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Activities } from './pages/Activities';
 import { ActivityDetail } from './pages/ActivityDetail';
+import { Finalizadas } from './pages/Finalizadas';
 import { Agenda } from './pages/Agenda';
 import { Reports } from './pages/Reports';
 import { Ponto } from './pages/Ponto';
@@ -60,6 +61,7 @@ function AppRoutes() {
       <Route path="/projetos/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
       <Route path="/atividades" element={<RequireAuth><Activities /></RequireAuth>} />
       <Route path="/atividades/:id" element={<RequireAuth><ActivityDetail /></RequireAuth>} />
+      <Route path="/finalizadas" element={<RequireAuth><Finalizadas /></RequireAuth>} />
       <Route path="/agenda" element={<RequireAuth><Agenda /></RequireAuth>} />
       <Route path="/relatorios" element={<RequireSocio><Reports /></RequireSocio>} />
       <Route path="/ponto" element={<RequireEstagiario><Ponto /></RequireEstagiario>} />

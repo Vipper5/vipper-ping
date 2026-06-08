@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Edit3 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Edit3, Sun, CalendarRange, ChevronRight, Pencil, CheckCheck } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Badge, StatusBadge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
 import { Loading } from '../components/ui/Loading';
 import { useAuth } from '../contexts/AuthContext';
 import { useUsers, useTasks, useProjects } from '../lib/hooks';
+import { taskPeriod } from '../lib/tasks';
+import { progressState } from '../lib/progress';
 import { setTaskComplete } from '../lib/api';
+import { TaskPeriod } from '../mocks/data';
 
 function isToday(d: string) {
   return d === new Date().toISOString().split('T')[0];
@@ -19,6 +24,7 @@ function isThisWeek(d: string) {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   return date >= startOfWeek && date <= endOfWeek;
 }
+
 // Monochromatic purple — intensity grows with progress
 function progressColor(pct: number): string {
   const sat = 42 + (pct / 100) * 32;
@@ -28,36 +34,76 @@ function progressColor(pct: number): string {
 
 interface ProgressMiniProps {
   label: string;
+  icon: React.ReactNode;
   done: number;
   total: number;
   subtitle: string;
 }
 
-function ProgressMini({ label, done, total, subtitle }: ProgressMiniProps) {
-  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
-  const color = progressColor(pct);
+// Card de progresso colorido no padrão do Dashboard (escala papel quente → vermelho → roxo → verde).
+function ProgressMini({ label, icon, done, total, subtitle }: ProgressMiniProps) {
+  const { empty, pct, color } = progressState(done, total);
+  const cornerTint = empty ? 'var(--papel-quente-soft)' : `${color}1f`;
+  const iconBg = empty ? 'var(--papel-quente-tint)' : `${color}22`;
   return (
     <div
-      className="rounded-xl border p-5"
-      style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+      className="rounded-xl border p-5 relative overflow-hidden"
+      style={{
+        backgroundColor: 'var(--surface)',
+        backgroundImage: `linear-gradient(135deg, ${cornerTint}, transparent 60%)`,
+        borderColor: 'var(--border)',
+      }}
     >
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-mono uppercase tracking-wider text-base-muted">{label}</p>
-        <span className="text-xl font-bold font-mono" style={{ color }}>
-          {pct}%
+      <div className="flex items-center gap-2">
+        <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: iconBg, color }}>
+          {icon}
         </span>
+        <p className="text-xs font-mono uppercase tracking-wider text-base-muted">{label}</p>
       </div>
-      <p className="text-xs text-base-secondary mb-3">{subtitle}</p>
+
+      {empty ? (
+        <div className="mt-3 mb-1.5">
+          <span className="text-sm font-semibold leading-snug block" style={{ color }}>Aguarde por novas atividades</span>
+        </div>
+      ) : (
+        <div className="flex items-baseline justify-between mt-3 mb-1.5">
+          <span className="text-3xl font-bold font-num tracking-tight leading-none" style={{ color }}>{pct}%</span>
+          <span className="text-xs font-num text-base-muted">{done}/{total}</span>
+        </div>
+      )}
       <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
         <div
           className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, backgroundColor: color }}
+          style={{ width: empty ? '100%' : `${pct}%`, backgroundColor: color, opacity: empty ? 0.35 : 1 }}
         />
       </div>
-      <p className="text-xs font-mono text-base-muted mt-2">
-        {done} de {total} concluídas
-      </p>
+      <p className="text-xs text-base-muted mt-2">{subtitle}</p>
     </div>
+  );
+}
+
+// Mini card clicável com a quantidade de atividades concluídas de um período.
+function DoneStat({
+  label, icon, count, color, onClick,
+}: { label: string; icon: React.ReactNode; count: number; color: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group rounded-lg border p-3 text-left transition-colors hover:bg-subtle"
+      style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1f`, color }}>
+          {icon}
+        </span>
+        <span className="text-2xl font-bold font-num tracking-tight" style={{ color }}>{count}</span>
+      </div>
+      <p className="text-[11px] font-medium text-base-secondary mt-1.5">{label}</p>
+      <p className="inline-flex items-center gap-0.5 text-[10px] text-base-muted group-hover:text-viper-500 transition-colors mt-0.5">
+        ver lista <ChevronRight size={10} />
+      </p>
+    </button>
   );
 }
 
@@ -69,6 +115,7 @@ export function MemberDetail() {
   const { data: projects } = useProjects();
 
   const member = users.find((u) => u.id === id);
+  const [doneModal, setDoneModal] = useState<TaskPeriod | 'all' | null>(null);
 
   if (usersLoading) {
     return (
@@ -88,14 +135,22 @@ export function MemberDetail() {
     );
   }
 
+  const isSelf = currentUser?.id === member.id;
   const canEdit = currentUser?.role === 'socio' && member.role === 'estagiario';
   const memberTasks = tasks.filter((t) => t.assignedTo.includes(member.id));
-  const todayTasks = memberTasks.filter((t) => isToday(t.dueDate));
-  const weekTasks = memberTasks.filter((t) => isThisWeek(t.dueDate));
   const completedTasks = memberTasks.filter((t) => t.status === 'concluida');
 
+  // Barras de progressão diária/semanal (por prazo — como antes).
+  const todayTasks = memberTasks.filter((t) => isToday(t.dueDate));
+  const weekTasks = memberTasks.filter((t) => isThisWeek(t.dueDate));
   const todayDone = todayTasks.filter((t) => t.status === 'concluida').length;
   const weekDone = weekTasks.filter((t) => t.status === 'concluida').length;
+
+  // Atividades concluídas por período (diárias x semanais) — usadas nos mini cards/popup.
+  const dailyDone = memberTasks.filter((t) => taskPeriod(t) === 'diaria' && t.status === 'concluida');
+  const weeklyDone = memberTasks.filter((t) => taskPeriod(t) === 'semanal' && t.status === 'concluida');
+  const modalTasks = doneModal === 'diaria' ? dailyDone : doneModal === 'semanal' ? weeklyDone : doneModal === 'all' ? completedTasks : [];
+
   const totalPct =
     memberTasks.length > 0 ? Math.round((completedTasks.length / memberTasks.length) * 100) : 0;
 
@@ -113,6 +168,16 @@ export function MemberDetail() {
       title={member.name}
       subtitle={member.title}
       back={{ to: '/membros', label: 'Membros' }}
+      action={
+        isSelf ? (
+          <Link
+            to="/perfil"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(134,55,204,0.55)]"
+          >
+            <Pencil size={14} /> <span className="hidden sm:inline">Editar perfil</span>
+          </Link>
+        ) : undefined
+      }
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column: profile card + overall progress */}
@@ -179,6 +244,37 @@ export function MemberDetail() {
                 style={{ width: `${totalPct}%`, backgroundColor: progressColor(totalPct) }}
               />
             </div>
+
+            {/* Mini cards de atividades feitas — clique abre o popup com a lista */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <DoneStat
+                label="Diárias feitas"
+                icon={<Sun size={14} />}
+                count={dailyDone.length}
+                color="#F5AE39"
+                onClick={() => setDoneModal('diaria')}
+              />
+              <DoneStat
+                label="Semanais feitas"
+                icon={<CalendarRange size={14} />}
+                count={weeklyDone.length}
+                color="#8637CC"
+                onClick={() => setDoneModal('semanal')}
+              />
+            </div>
+
+            {/* Todas as tasks feitas — abre o popup com todas as concluídas */}
+            <button
+              type="button"
+              onClick={() => setDoneModal('all')}
+              className="group w-full mt-3 inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-base-secondary transition-colors hover:bg-subtle hover:border-viper-500"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
+            >
+              <CheckCheck size={15} className="text-success" />
+              Todas as tasks feitas
+              <span className="font-num font-bold text-success">{completedTasks.length}</span>
+              <ChevronRight size={14} className="text-base-muted group-hover:text-viper-500 transition-colors" />
+            </button>
           </div>
         </div>
 
@@ -187,12 +283,14 @@ export function MemberDetail() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <ProgressMini
               label="Progresso diário"
+              icon={<Sun size={15} />}
               done={todayDone}
               total={todayTasks.length}
               subtitle={todayTasks.length === 0 ? 'Sem tarefas hoje' : `${todayTasks.length} com prazo hoje`}
             />
             <ProgressMini
               label="Progresso semanal"
+              icon={<CalendarRange size={15} />}
               done={weekDone}
               total={weekTasks.length}
               subtitle={weekTasks.length === 0 ? 'Sem tarefas esta semana' : `${weekTasks.length} na semana`}
@@ -285,6 +383,43 @@ export function MemberDetail() {
           </div>
         </div>
       </div>
+
+      {/* Lista das atividades concluídas do período clicado */}
+      <Modal
+        open={doneModal !== null}
+        onClose={() => setDoneModal(null)}
+        title={doneModal === 'all' ? 'Todas as tasks concluídas' : doneModal === 'semanal' ? 'Semanais concluídas' : 'Diárias concluídas'}
+        description={`${modalTasks.length} ${modalTasks.length === 1 ? 'atividade concluída' : 'atividades concluídas'} por ${member.name}`}
+        size="md"
+      >
+        {modalTasks.length === 0 ? (
+          <p className="text-sm text-base-muted py-6 text-center">Nenhuma atividade concluída neste período.</p>
+        ) : (
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto -mr-2 pr-2">
+            {modalTasks.map((task) => {
+              const isWeekly = taskPeriod(task) === 'semanal';
+              const PeriodIcon = isWeekly ? CalendarRange : Sun;
+              const periodColor = isWeekly ? '#8637CC' : '#F5AE39';
+              return (
+                <Link
+                  key={task.id}
+                  to={`/atividades/${task.id}`}
+                  onClick={() => setDoneModal(null)}
+                  className="flex items-center gap-3 p-3 rounded-md transition-colors hover:bg-subtle"
+                  style={{ backgroundColor: 'var(--bg-subtle)' }}
+                >
+                  <PeriodIcon size={15} className="shrink-0" style={{ color: periodColor }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium line-through text-base-muted truncate">{task.title}</p>
+                    <p className="text-xs text-base-muted font-mono truncate">{getProjectName(task.projectId)}</p>
+                  </div>
+                  <StatusBadge status={task.status} />
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
     </Layout>
   );
 }

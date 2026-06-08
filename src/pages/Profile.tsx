@@ -1,12 +1,20 @@
 import React, { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
+import { StatusBadge } from '../components/ui/Badge';
 import { FormField, Input, Textarea } from '../components/ui/FormField';
 import { useAuth } from '../contexts/AuthContext';
-import { Camera, Save, User } from 'lucide-react';
+import { useTasks, useProjects } from '../lib/hooks';
+import { taskPeriod } from '../lib/tasks';
+import { Camera, Save, User, Sun, CalendarRange, ExternalLink, CheckCheck } from 'lucide-react';
+
+const STATUS_RANK: Record<string, number> = { em_andamento: 0, pendente: 1, concluida: 2 };
 
 export function Profile() {
   const { user, updateProfile } = useAuth();
+  const { data: tasks } = useTasks();
+  const { data: projects } = useProjects();
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -44,27 +52,44 @@ export function Profile() {
     form.bio !== (user.bio ?? '') ||
     form.photo !== (user.photo ?? '');
 
+  // Minhas tasks — pendentes/andamento primeiro; concluídas (riscadas) por último.
+  const myTasks = tasks.filter((t) => t.assignedTo.includes(user.id));
+  const doneCount = myTasks.filter((t) => t.status === 'concluida').length;
+  const sortedTasks = [...myTasks].sort((a, b) => {
+    const r = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
+    if (r !== 0) return r;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+
   return (
     <Layout
       title="Meu perfil"
       subtitle="Gerencie suas informações pessoais"
       action={
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleSave}
-          disabled={!hasChanges && !saved}
-        >
-          {saved ? (
-            <>
-              <span>✓</span> Salvo
-            </>
-          ) : (
-            <>
-              <Save size={14} /> Salvar alterações
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/membros/${user.id}`}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(134,55,204,0.55)]"
+          >
+            <ExternalLink size={14} /> <span className="hidden sm:inline">Ver como membro</span>
+          </Link>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSave}
+            disabled={!hasChanges && !saved}
+          >
+            {saved ? (
+              <>
+                <span>✓</span> Salvo
+              </>
+            ) : (
+              <>
+                <Save size={14} /> Salvar alterações
+              </>
+            )}
+          </Button>
+        </div>
       }
     >
       <div className="max-w-2xl mx-auto">
@@ -170,6 +195,57 @@ export function Profile() {
               <span className="text-base-secondary">ID:</span> {user.id}
             </p>
           </div>
+        </div>
+
+        {/* Minhas tasks — concluídas aparecem riscadas */}
+        <div
+          className="rounded-xl border mt-5 overflow-hidden"
+          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+        >
+          <div
+            className="flex items-center justify-between px-5 py-4 border-b"
+            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-subtle)' }}
+          >
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-base-primary">Minhas tasks</h3>
+              {myTasks.length > 0 && (
+                <span className="text-xs font-num text-base-muted">{doneCount}/{myTasks.length} concluídas</span>
+              )}
+            </div>
+            <Link to="/finalizadas" className="text-xs text-viper-500 hover:text-viper-400 font-mono transition-colors flex items-center gap-1">
+              <CheckCheck size={12} /> finalizadas
+            </Link>
+          </div>
+
+          {myTasks.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-base-muted">Nenhuma task atribuída a você.</p>
+          ) : (
+            <div className="divide-y max-h-[22rem] overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
+              {sortedTasks.map((t) => {
+                const isDone = t.status === 'concluida';
+                const PeriodIcon = taskPeriod(t) === 'semanal' ? CalendarRange : Sun;
+                const periodColor = taskPeriod(t) === 'semanal' ? '#8637CC' : '#F5AE39';
+                return (
+                  <Link
+                    key={t.id}
+                    to={`/atividades/${t.id}`}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-subtle transition-colors"
+                  >
+                    <PeriodIcon size={15} className="shrink-0" style={{ color: periodColor }} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${isDone ? 'line-through text-base-muted' : 'text-base-primary'}`}>
+                        {t.title}
+                      </p>
+                      <p className="text-xs text-base-muted font-mono truncate">
+                        {projects.find((p) => p.id === t.projectId)?.name ?? 'Sem projeto'}
+                      </p>
+                    </div>
+                    <StatusBadge status={t.status} />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

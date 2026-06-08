@@ -1,19 +1,40 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ListChecks, CalendarRange, Sun, CalendarClock, Flag } from 'lucide-react';
+import { CheckCircle2, ListChecks, CalendarRange, Sun, CalendarClock, Flag, Plus } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { StatusBadge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
+import { FormField, Input, Select, Textarea } from '../components/ui/FormField';
 import { Loading, ErrorState } from '../components/ui/Loading';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { useTasks, useProjects, useUsers } from '../lib/hooks';
 import { progressState } from '../lib/progress';
+import { createTask } from '../lib/api';
 import { Avatar } from '../components/ui/Avatar';
 import {
   Task,
   Project,
   User,
   TaskPeriod,
+  TaskPriority,
 } from '../mocks/data';
+
+interface CreateForm {
+  title: string;
+  description: string;
+  projectId: string;
+  period: TaskPeriod;
+  parentTaskId: string;
+  assignedTo: string[];
+  priority: TaskPriority;
+  dueDate: string;
+}
+const emptyCreate: CreateForm = {
+  title: '', description: '', projectId: '', period: 'diaria', parentTaskId: '',
+  assignedTo: [], priority: 'media', dueDate: '',
+};
 
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
@@ -178,7 +199,8 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
 
 export function Activities() {
   const { user } = useAuth();
-  const { data: tasks, loading, error } = useTasks();
+  const toast = useToast();
+  const { data: tasks, loading, error, reload } = useTasks();
   const { data: projects } = useProjects();
   const { data: users } = useUsers();
   const [period, setPeriod] = useState<TaskPeriod>('diaria');
@@ -186,7 +208,56 @@ export function Activities() {
   const [filterAssignee, setFilterAssignee] = useState<string>('mine');
   const [hoveredFilter, setHoveredFilter] = useState<string | null>(null);
 
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
+  const [saving, setSaving] = useState(false);
+
   const isSocio = user?.role === 'socio';
+
+  // Semanais do projeto escolhido — possíveis "pais" de uma diária.
+  const weeklyOptions = tasks.filter(
+    (t) => taskPeriod(t) === 'semanal' && t.projectId === createForm.projectId,
+  );
+
+  const openCreate = () => {
+    setCreateForm({ ...emptyCreate, period, dueDate: new Date().toISOString().split('T')[0] });
+    setShowCreate(true);
+  };
+
+  const toggleCreateAssignee = (uid: string) => {
+    setCreateForm((f) => ({
+      ...f,
+      assignedTo: f.assignedTo.includes(uid)
+        ? f.assignedTo.filter((x) => x !== uid)
+        : f.assignedTo.length < 2 ? [...f.assignedTo, uid] : f.assignedTo,
+    }));
+  };
+
+  const submitCreate = async () => {
+    if (!createForm.title.trim() || createForm.assignedTo.length === 0 || !user || saving) return;
+    setSaving(true);
+    try {
+      await createTask({
+        title: createForm.title.trim(),
+        description: createForm.description.trim(),
+        projectId: createForm.projectId,
+        assignedTo: createForm.assignedTo,
+        priority: createForm.priority,
+        period: createForm.period,
+        parentTaskId: createForm.period === 'diaria' ? (createForm.parentTaskId || undefined) : undefined,
+        dueDate: createForm.dueDate || new Date().toISOString().split('T')[0],
+        createdBy: user.id,
+      });
+      setShowCreate(false);
+      setCreateForm(emptyCreate);
+      reload();
+      toast.success('Task criada.');
+    } catch (e) {
+      toast.error(`Não foi possível criar a task: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // 1) recorta por responsável (define as contagens do toggle e dos status);
   // 2) pelo período do toggle; 3) por status.
@@ -242,6 +313,13 @@ export function Activities() {
     <Layout
       title="Tasks"
       subtitle="To-do list do time"
+      action={
+        isSocio ? (
+          <Button variant="primary" size="sm" onClick={openCreate}>
+            <Plus size={15} /> <span className="hidden sm:inline">Nova task</span>
+          </Button>
+        ) : undefined
+      }
     >
       {/* Toggle Diário / Semanal */}
       <div className="mb-5">
@@ -359,6 +437,126 @@ export function Activities() {
           ))}
         </div>
       )}
+
+      {/* Nova task */}
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="Nova task"
+        description="Crie uma atividade diária ou semanal."
+        size="md"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setShowCreate(false)}>Cancelar</Button>
+            <Button
+              variant="primary"
+              onClick={submitCreate}
+              disabled={!createForm.title.trim() || createForm.assignedTo.length === 0 || saving}
+            >
+              {saving ? 'Criando…' : 'Criar task'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Título" required>
+            <Input
+              value={createForm.title}
+              onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Ex.: Ajustar layout do header"
+              autoFocus
+            />
+          </FormField>
+
+          <FormField label="Descrição">
+            <Textarea
+              value={createForm.description}
+              onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
+              rows={2}
+              placeholder="Descreva o que precisa ser feito..."
+            />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Período">
+              <Select
+                value={createForm.period}
+                onChange={(e) => setCreateForm((f) => ({ ...f, period: e.target.value as TaskPeriod, parentTaskId: '' }))}
+              >
+                <option value="diaria">Diária</option>
+                <option value="semanal">Semanal</option>
+              </Select>
+            </FormField>
+            <FormField label="Projeto">
+              <Select
+                value={createForm.projectId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value, parentTaskId: '' }))}
+              >
+                <option value="">Sem projeto</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+
+          {/* Semanal pai — só para diária, quando há projeto com semanais */}
+          {createForm.period === 'diaria' && createForm.projectId && weeklyOptions.length > 0 && (
+            <FormField label="Vincular a uma semanal" hint="Opcional — liga a diária a um objetivo semanal">
+              <Select
+                value={createForm.parentTaskId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, parentTaskId: e.target.value }))}
+              >
+                <option value="">Nenhuma</option>
+                {weeklyOptions.map((w) => (
+                  <option key={w.id} value={w.id}>{w.title}</option>
+                ))}
+              </Select>
+            </FormField>
+          )}
+
+          <FormField label="Responsáveis" required hint="Selecione até 2 responsáveis">
+            <div className="flex gap-2 flex-wrap pt-1">
+              {users.map((u) => {
+                const isSelected = createForm.assignedTo.includes(u.id);
+                const isDisabled = !isSelected && createForm.assignedTo.length >= 2;
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => toggleCreateAssignee(u.id)}
+                    className={`chip flex items-center gap-2 px-3 py-2 rounded-md text-sm ${isSelected ? 'chip-selected' : ''}`}
+                  >
+                    <Avatar user={u} size={24} fontSize={10} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
+                    {u.name}
+                  </button>
+                );
+              })}
+            </div>
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Prioridade">
+              <Select
+                value={createForm.priority}
+                onChange={(e) => setCreateForm((f) => ({ ...f, priority: e.target.value as TaskPriority }))}
+              >
+                <option value="baixa">Baixa</option>
+                <option value="media">Média</option>
+                <option value="alta">Alta</option>
+              </Select>
+            </FormField>
+            <FormField label="Prazo">
+              <Input
+                type="date"
+                value={createForm.dueDate}
+                onChange={(e) => setCreateForm((f) => ({ ...f, dueDate: e.target.value }))}
+              />
+            </FormField>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   );
 }

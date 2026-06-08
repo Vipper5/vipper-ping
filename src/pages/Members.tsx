@@ -37,7 +37,7 @@ export function Members() {
           return (
             <Link
               key={member.id}
-              to={isCurrentUser ? '/perfil' : `/membros/${member.id}`}
+              to={`/membros/${member.id}`}
               className="group card-interactive rounded-md p-5 flex flex-col gap-4"
             >
               {/* Header: avatar + name */}
