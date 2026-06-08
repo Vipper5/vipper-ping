@@ -210,6 +210,44 @@ export type Database = {
           },
         ]
       }
+      project_objectives: {
+        Row: {
+          created_at: string
+          description: string | null
+          done: boolean
+          id: string
+          position: number
+          project_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          done?: boolean
+          id?: string
+          position?: number
+          project_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          done?: boolean
+          id?: string
+          position?: number
+          project_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_objectives_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_responsibles: {
         Row: {
           profile_id: string
@@ -288,6 +326,7 @@ export type Database = {
       subtasks: {
         Row: {
           created_at: string
+          description: string | null
           done: boolean
           id: string
           position: number
@@ -296,6 +335,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          description?: string | null
           done?: boolean
           id?: string
           position?: number
@@ -304,6 +344,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          description?: string | null
           done?: boolean
           id?: string
           position?: number

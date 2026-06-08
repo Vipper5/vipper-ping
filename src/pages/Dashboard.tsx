@@ -14,7 +14,7 @@ import {
   FolderKanban,
   TrendingUp,
   ArrowRight,
-  CalendarDays,
+  CalendarRange,
   Sun,
   ChevronRight,
 } from 'lucide-react';
@@ -23,14 +23,10 @@ import { Link } from 'react-router-dom';
 function isToday(d: string) {
   return d === new Date().toISOString().split('T')[0];
 }
-function isThisWeek(d: string) {
-  const now = new Date();
-  const date = new Date(d + 'T00:00:00');
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  return date >= startOfWeek && date <= endOfWeek;
+
+// Período da task (legado sem período = diária) — mesma regra da página de Tasks.
+function taskPeriod(t: Task): 'diaria' | 'semanal' {
+  return t.period === 'semanal' ? 'semanal' : 'diaria';
 }
 
 interface ProgressTileProps {
@@ -106,7 +102,7 @@ function ProgressTile({ label, done, total, subtitle, icon, onClick }: ProgressT
 
 // Wide member strip — progresso SEMANAL do membro (sócio vê os demais membros)
 function MemberWeekCard({ member, tasks }: { member: User; tasks: Task[] }) {
-  const weekTasks = tasks.filter((t) => t.assignedTo.includes(member.id) && isThisWeek(t.dueDate));
+  const weekTasks = tasks.filter((t) => t.assignedTo.includes(member.id) && taskPeriod(t) === 'semanal');
   const done = weekTasks.filter((t) => t.status === 'concluida').length;
   const { empty, pct, color } = progressState(done, weekTasks.length);
   const roleLabel = member.role === 'socio' ? 'Sócio' : 'Estagiário';
@@ -170,25 +166,32 @@ export function Dashboard() {
   const loading = tasksLoading || projectsLoading || usersLoading;
 
   const myTasks = allTasks.filter((t) => t.assignedTo.includes(user.id));
-  const todayTasks = myTasks.filter((t) => isToday(t.dueDate));
-  const weekTasks = myTasks.filter((t) => isThisWeek(t.dueDate));
+  // "Tasks de hoje" lista apenas as diárias com prazo para hoje.
+  const todayTasks = myTasks.filter((t) => isToday(t.dueDate) && taskPeriod(t) === 'diaria');
+  // Diárias x semanais por período (mesma taxonomia da página de Tasks).
+  const dailyTasks = myTasks.filter((t) => taskPeriod(t) === 'diaria');
+  const weeklyTasks = myTasks.filter((t) => taskPeriod(t) === 'semanal');
   const completedTasks = myTasks.filter((t) => t.status === 'concluida');
   const activeProjects = projects.filter((p) => p.status === 'Ativo');
 
-  const todayDone = todayTasks.filter((t) => t.status === 'concluida').length;
-  const weekDone = weekTasks.filter((t) => t.status === 'concluida').length;
+  const dailyDone = dailyTasks.filter((t) => t.status === 'concluida').length;
+  const weeklyDone = weeklyTasks.filter((t) => t.status === 'concluida').length;
 
-  // Comparativo de concluídas vs mês anterior (baseline)
-  const prevMonthCompleted = 4;
-  const monthDelta = Math.round(((completedTasks.length - prevMonthCompleted) / prevMonthCompleted) * 100);
+  // Comparativo de concluídas vs mês anterior. É o primeiro mês de operação,
+  // então não há baseline anterior para comparar (evita divisão por zero).
+  const prevMonthCompleted = 0;
+  const hasPrevMonth = prevMonthCompleted > 0;
+  const monthDelta = hasPrevMonth
+    ? Math.round(((completedTasks.length - prevMonthCompleted) / prevMonthCompleted) * 100)
+    : 0;
   const monthTrend = monthDelta > 0 ? 'up' : monthDelta < 0 ? 'down' : 'neutral';
 
   // Sócio acompanha os demais membros (todos menos ele mesmo)
   const otherMembers = isSocio ? users.filter((u) => u.id !== user.id) : [];
 
-  const modalTasks: Task[] = periodModal === 'diario' ? todayTasks : periodModal === 'semanal' ? weekTasks : [];
-  const modalTitle = periodModal === 'diario' ? 'Tasks de hoje' : 'Tasks da semana';
-  const modalDesc = periodModal === 'diario' ? 'Tarefas com prazo para hoje' : 'Tarefas com prazo nesta semana';
+  const modalTasks: Task[] = periodModal === 'diario' ? dailyTasks : periodModal === 'semanal' ? weeklyTasks : [];
+  const modalTitle = periodModal === 'diario' ? 'Tasks diárias' : 'Tasks semanais';
+  const modalDesc = periodModal === 'diario' ? 'Suas atividades diárias' : 'Suas atividades semanais';
 
   if (loading) {
     return (
@@ -257,18 +260,18 @@ export function Dashboard() {
         {/* Progress tiles — compactos, lado a lado (col 3 e 4) */}
         <ProgressTile
           label="Diário"
-          done={todayDone}
-          total={todayTasks.length}
+          done={dailyDone}
+          total={dailyTasks.length}
           icon={<Sun size={15} />}
-          subtitle={todayTasks.length === 0 ? 'Sem tarefas hoje' : 'Prazo hoje'}
+          subtitle={dailyTasks.length === 0 ? 'Sem tasks diárias' : `${dailyTasks.length} ${dailyTasks.length === 1 ? 'task diária' : 'tasks diárias'}`}
           onClick={() => setPeriodModal('diario')}
         />
         <ProgressTile
           label="Semanal"
-          done={weekDone}
-          total={weekTasks.length}
-          icon={<CalendarDays size={15} />}
-          subtitle={weekTasks.length === 0 ? 'Sem tarefas' : 'Prazo na semana'}
+          done={weeklyDone}
+          total={weeklyTasks.length}
+          icon={<CalendarRange size={15} />}
+          subtitle={weeklyTasks.length === 0 ? 'Sem tasks semanais' : `${weeklyTasks.length} ${weeklyTasks.length === 1 ? 'task semanal' : 'tasks semanais'}`}
           onClick={() => setPeriodModal('semanal')}
         />
 
@@ -279,7 +282,7 @@ export function Dashboard() {
           value={completedTasks.length}
           icon={<TrendingUp size={16} />}
           trend={monthTrend}
-          trendLabel={`${monthDelta >= 0 ? '+' : ''}${monthDelta}% vs mês anterior`}
+          trendLabel={hasPrevMonth ? `${monthDelta >= 0 ? '+' : ''}${monthDelta}% vs mês anterior` : 'Primeiro mês'}
         />
 
         {/* Membros — faixas largas (sócio acompanha os demais) */}

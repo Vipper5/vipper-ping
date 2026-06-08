@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,30 +8,38 @@ import {
   X,
   CalendarClock,
   FolderKanban,
-  FileText,
   Target,
   RotateCcw,
   Trash2,
+  Pencil,
+  ChevronRight,
+  Sun,
+  CalendarRange,
+  Flag,
 } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
-import { StatusBadge, Badge } from '../components/ui/Badge';
+import { StatusBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { FormField, Input } from '../components/ui/FormField';
+import { FormField, Input, Select, Textarea } from '../components/ui/FormField';
 import { Loading } from '../components/ui/Loading';
 import { useAuth } from '../contexts/AuthContext';
 import { useTask } from '../lib/hooks';
 import { useProjects, useUsers, useTasks } from '../lib/hooks';
+import { useToast } from '../contexts/ToastContext';
 import { Avatar } from '../components/ui/Avatar';
 import { progressColor, progressState } from '../lib/progress';
 import {
   setTaskComplete,
   setTaskStatus,
+  updateTask,
   toggleSubtask as apiToggleSubtask,
   addSubtask as apiAddSubtask,
+  updateSubtask as apiUpdateSubtask,
   deleteSubtask as apiDeleteSubtask,
   deleteTask as apiDeleteTask,
 } from '../lib/api';
+import { User as TeamUser, TaskPriority, Subtask } from '../mocks/data';
 
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -42,18 +50,73 @@ function formatDateTime(d: string) {
   });
 }
 
+// Cor de acento por status — dá identidade visual à página de task (diferente do projeto).
+const STATUS_COLOR: Record<string, string> = {
+  pendente: '#94908a',
+  em_andamento: '#5294E6',
+  concluida: '#15BB77',
+};
+const PRIORITY_COLOR: Record<string, string> = {
+  alta: '#E54056',
+  media: '#F5AE39',
+  baixa: '#15BB77',
+};
+
+interface EditTaskForm {
+  title: string; description: string; priority: TaskPriority; dueDate: string; assignedTo: string[];
+}
+interface SubForm {
+  title: string; description: string;
+}
+
+// Seleção de responsáveis (máx. 2), igual ao padrão dos popups de criação.
+function AssigneePicker({ value, onToggle, users }: { value: string[]; onToggle: (id: string) => void; users: TeamUser[] }) {
+  return (
+    <div className="flex gap-2 flex-wrap pt-1">
+      {users.map((u) => {
+        const isSelected = value.includes(u.id);
+        const isDisabled = !isSelected && value.length >= 2;
+        return (
+          <button
+            key={u.id}
+            type="button"
+            disabled={isDisabled}
+            onClick={() => onToggle(u.id)}
+            className={`chip flex items-center gap-2 px-3 py-2 rounded-md text-sm ${isSelected ? 'chip-selected' : ''}`}
+          >
+            <Avatar user={u} size={24} fontSize={10} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
+            {u.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ActivityDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const { data: task, loading, reload } = useTask(id);
   const { data: projects } = useProjects();
   const { data: users } = useUsers();
   const { data: allTasks } = useTasks();
-  const [newSubtask, setNewSubtask] = useState('');
+
   const [showSubModal, setShowSubModal] = useState(false);
+  const [subForm, setSubForm] = useState<SubForm>({ title: '', description: '' });
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Edição da task diária/semanal.
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState<EditTaskForm>({ title: '', description: '', priority: 'media', dueDate: '', assignedTo: [] });
+
+  // Popup de detalhe/edição de uma subtarefa.
+  const [openSub, setOpenSub] = useState<Subtask | null>(null);
+  const [subEditing, setSubEditing] = useState(false);
+  const [subEditForm, setSubEditForm] = useState<SubForm>({ title: '', description: '' });
 
   if (loading) {
     return (
@@ -103,13 +166,18 @@ export function ActivityDetail() {
   const isOwner = task.assignedTo.includes(user?.id ?? '');
   const canEdit = isOwner || isSocio;
 
+  const statusColor = STATUS_COLOR[task.status] ?? '#94908a';
+  const PeriodIcon = isWeekly ? CalendarRange : Sun;
+  const periodColor = isWeekly ? '#8637CC' : '#F5AE39';
+  const prioColor = PRIORITY_COLOR[task.priority] ?? '#F5AE39';
+
+  // ---- handlers ----
   const toggleComplete = async () => {
     if (!canEdit) return;
     await setTaskComplete(task.id, task.status !== 'concluida');
     reload();
   };
 
-  // Move a atividade pendente para "em andamento" (passo anterior ao concluir).
   const startProgress = async () => {
     if (!canEdit) return;
     await setTaskStatus(task.id, 'em_andamento');
@@ -119,7 +187,6 @@ export function ActivityDetail() {
   const toggleSubtask = async (subtaskId: string, currentDone: boolean) => {
     if (!canEdit) return;
     await apiToggleSubtask(subtaskId, !currentDone);
-    // Ao concluir uma subtarefa, a atividade pendente passa automaticamente a "em andamento".
     if (!currentDone && task.status === 'pendente') {
       await setTaskStatus(task.id, 'em_andamento');
     }
@@ -127,16 +194,81 @@ export function ActivityDetail() {
   };
 
   const addSubtask = async () => {
-    if (!newSubtask.trim()) return;
-    await apiAddSubtask(task.id, newSubtask.trim(), task.subtasks.length);
-    setNewSubtask('');
-    setShowSubModal(false);
-    reload();
+    if (!subForm.title.trim() || saving) return;
+    setSaving(true);
+    try {
+      await apiAddSubtask(task.id, subForm.title.trim(), task.subtasks.length, subForm.description);
+      setSubForm({ title: '', description: '' });
+      setShowSubModal(false);
+      reload();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteSubtask = async (subtaskId: string) => {
     await apiDeleteSubtask(subtaskId);
+    if (openSub?.id === subtaskId) setOpenSub(null);
     reload();
+  };
+
+  // Abre o popup de uma subtarefa (modo leitura).
+  const openSubtask = (sub: Subtask) => {
+    setOpenSub(sub);
+    setSubEditing(false);
+    setSubEditForm({ title: sub.title, description: sub.description ?? '' });
+  };
+
+  const saveSubEdit = async () => {
+    if (!openSub || !subEditForm.title.trim() || saving) return;
+    setSaving(true);
+    try {
+      await apiUpdateSubtask(openSub.id, {
+        title: subEditForm.title.trim(),
+        description: subEditForm.description.trim() || null,
+      });
+      setOpenSub(null);
+      reload();
+      toast.success('Subtarefa atualizada.');
+    } catch {
+      toast.error('Não foi possível salvar a subtarefa.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditTask = () => {
+    setEditForm({
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      assignedTo: task.assignedTo,
+    });
+    setShowEdit(true);
+  };
+
+  const saveEditTask = async () => {
+    if (!editForm.title.trim() || saving) return;
+    setSaving(true);
+    try {
+      await updateTask(task.id, {
+        title: editForm.title.trim(),
+        description: editForm.description,
+        note: task.note ?? '',
+        projectId: task.projectId,
+        assignedTo: editForm.assignedTo,
+        priority: editForm.priority,
+        dueDate: editForm.dueDate,
+      });
+      setShowEdit(false);
+      reload();
+      toast.success('Task atualizada.');
+    } catch {
+      toast.error('Não foi possível salvar a task.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteTask = async () => {
@@ -150,6 +282,17 @@ export function ActivityDetail() {
     }
   };
 
+  // Cabeçalho de seção reutilizável com ícone colorido (identidade de "task").
+  const SectionTitle = ({ icon, label, count }: { icon: ReactNode; label: string; count?: string }) => (
+    <div className="flex items-center gap-2">
+      <span className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: `${periodColor}1f`, color: periodColor }}>
+        {icon}
+      </span>
+      <h3 className="text-sm font-semibold text-base-primary">{label}</h3>
+      {count && <span className="text-xs font-num text-base-muted">{count}</span>}
+    </div>
+  );
+
   return (
     <Layout
       title={task.title}
@@ -158,7 +301,6 @@ export function ActivityDetail() {
         <div className="flex items-center gap-2">
           {canEdit && (
             isDone ? (
-              // Concluída → reverter (contorno na cor verde do status)
               <button
                 onClick={toggleComplete}
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border bg-transparent transition-all duration-150 hover:text-white"
@@ -169,7 +311,6 @@ export function ActivityDetail() {
                 <RotateCcw size={14} /> <span className="hidden sm:inline">Reverter</span>
               </button>
             ) : task.status === 'em_andamento' ? (
-              // Em andamento → concluir (verde, cor do status concluída)
               <button
                 onClick={toggleComplete}
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(21,187,119,0.55)]"
@@ -178,7 +319,6 @@ export function ActivityDetail() {
                 <CheckCircle2 size={14} /> <span className="hidden sm:inline">Concluir</span>
               </button>
             ) : (
-              // Pendente → mover para em andamento (azul, cor do status em andamento)
               <button
                 onClick={startProgress}
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(82,148,230,0.55)]"
@@ -187,6 +327,14 @@ export function ActivityDetail() {
                 <Circle size={14} /> <span className="hidden sm:inline">Em andamento</span>
               </button>
             )
+          )}
+          {isSocio && (
+            <button
+              onClick={openEditTask}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(134,55,204,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-viper-500"
+            >
+              <Pencil size={14} /> <span className="hidden sm:inline">Editar</span>
+            </button>
           )}
           {isSocio && (
             <button
@@ -199,220 +347,250 @@ export function ActivityDetail() {
         </div>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main column */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Resumo do projeto a que a atividade pertence (ou "Atividade única") */}
-          <div className="card rounded-md p-5">
-            {project ? (
-              <>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FolderKanban size={16} className="text-viper-500 shrink-0" />
-                    <Link to={`/projetos/${project.id}`} className="font-mono font-semibold text-base-primary hover:text-viper-500 transition-colors truncate">
-                      {project.name}
-                    </Link>
-                    <StatusBadge status={project.status} />
-                  </div>
-                  <Link to={`/projetos/${project.id}`} className="shrink-0 text-xs text-viper-500 hover:text-viper-400 font-mono transition-colors">
-                    ver projeto →
-                  </Link>
-                </div>
-                <p className="text-xs text-base-muted mt-1 font-mono">{project.client}</p>
-                {project.description && (
-                  <p className="text-sm text-base-secondary mt-2 leading-relaxed line-clamp-2">{project.description}</p>
-                )}
-                {parentWeekly && (
-                  <div className="mt-3 pt-3 border-t flex items-center gap-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                    <Target size={13} className="text-viper-400 shrink-0" />
-                    <span className="text-base-muted">Task semanal:</span>
-                    <Link to={`/atividades/${parentWeekly.id}`} className="font-medium text-viper-500 hover:text-viper-400 truncate transition-colors">
-                      {parentWeekly.title}
-                    </Link>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-base-muted shrink-0" />
-                <h3 className="text-sm font-semibold text-base-primary">Task única</h3>
-              </div>
-            )}
-          </div>
+      {/* Layout de "ticket": banner com acento de status (distinto do dashboard de projeto) */}
+      <div className="max-w-3xl mx-auto space-y-5">
+        {/* HERO — faixa de status com meta e progresso */}
+        <div
+          className="relative rounded-xl overflow-hidden"
+          style={{
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--card-shadow)',
+            backgroundColor: 'var(--surface)',
+            backgroundImage: `linear-gradient(120deg, ${statusColor}1f, transparent 62%)`,
+          }}
+        >
+          <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: statusColor }} />
+          <div className="p-6 pl-7">
+            {/* chips: período + status + prioridade */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full font-mono font-semibold tracking-wide px-2.5 py-1 text-[11px]"
+                style={{ backgroundColor: `${periodColor}1f`, color: periodColor }}
+              >
+                <PeriodIcon size={13} />
+                {isWeekly ? 'Semanal' : 'Diária'}
+              </span>
+              <StatusBadge status={task.status} />
+              <span
+                className="inline-flex items-center gap-1 rounded-full font-mono font-semibold px-2.5 py-1 text-[11px]"
+                style={{ backgroundColor: `${prioColor}1f`, color: prioColor }}
+              >
+                <Flag size={11} /> {task.priority === 'alta' ? 'Alta' : task.priority === 'baixa' ? 'Baixa' : 'Média'}
+              </span>
+            </div>
 
-          {/* Progresso: semanal vem das diárias; diária vem das subtarefas */}
-          <div className="card rounded-md p-5">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-base-primary">Progresso</h3>
-              {progressEmpty ? (
-                <span className="text-sm font-semibold" style={{ color: progressBarColor }}>Aguarde por novas atividades</span>
+            <h2 className={`text-2xl font-bold leading-tight ${isDone ? 'line-through text-base-muted' : 'text-base-primary'}`}>
+              {task.title}
+            </h2>
+
+            {/* meta: prazo · projeto · semanal-pai · responsáveis */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm">
+              <span className="inline-flex items-center gap-1.5 text-base-secondary font-mono">
+                <CalendarClock size={14} className="text-base-muted" />
+                {formatDate(task.dueDate)}
+              </span>
+              {project ? (
+                <Link to={`/projetos/${project.id}`} className="inline-flex items-center gap-1.5 text-viper-500 hover:text-viper-400 font-mono transition-colors">
+                  <FolderKanban size={14} /> {project.name}
+                </Link>
               ) : (
-                <span className="text-lg font-bold font-num" style={{ color: progressBarColor }}>{progressPct}%</span>
+                <span className="inline-flex items-center gap-1.5 text-base-muted font-mono">
+                  <FolderKanban size={14} /> Task única
+                </span>
+              )}
+              {parentWeekly && (
+                <Link to={`/atividades/${parentWeekly.id}`} className="inline-flex items-center gap-1.5 text-base-secondary hover:text-viper-500 font-mono transition-colors truncate max-w-[14rem]">
+                  <Target size={13} className="text-viper-400" /> {parentWeekly.title}
+                </Link>
+              )}
+              {assignees.length > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="flex -space-x-1.5">
+                    {assignees.map((a) => (
+                      <Avatar key={a!.id} user={a!} size={22} fontSize={9} className="border-2 [border-color:var(--surface)]" />
+                    ))}
+                  </span>
+                  <span className="text-xs text-base-muted font-mono">{assignees.map((a) => a!.name).join(' + ')}</span>
+                </span>
               )}
             </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: progressEmpty ? '100%' : `${progressPct}%`, backgroundColor: progressBarColor, opacity: progressEmpty ? 0.35 : 1 }}
-              />
-            </div>
-            <p className="text-xs text-base-muted mt-2">
-              {progressCaption}
-              {isDone && task.completedAt ? ` · concluída em ${formatDateTime(task.completedAt)}` : ''}
-            </p>
-          </div>
 
-          {/* Description */}
-          <div className="card rounded-md p-5">
-            <h3 className="text-sm font-semibold text-base-primary mb-2">Descrição</h3>
+            {/* progresso */}
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-base-muted">{progressCaption}{isDone && task.completedAt ? ` · concluída em ${formatDateTime(task.completedAt)}` : ''}</span>
+                {progressEmpty ? (
+                  <span className="text-xs font-semibold" style={{ color: progressBarColor }}>Aguarde</span>
+                ) : (
+                  <span className="text-base font-bold font-num" style={{ color: progressBarColor }}>{progressPct}%</span>
+                )}
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: progressEmpty ? '100%' : `${progressPct}%`, backgroundColor: progressBarColor, opacity: progressEmpty ? 0.35 : 1 }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* DESCRIÇÃO */}
+        <div className="card rounded-xl p-5">
+          <SectionTitle icon={<Pencil size={13} />} label="Descrição" />
+          <div className="mt-3">
             {task.description ? (
-              <p className="text-sm text-base-secondary leading-relaxed">{task.description}</p>
+              <p className="text-sm text-base-secondary leading-relaxed whitespace-pre-wrap">{task.description}</p>
             ) : (
-              <p className="text-xs text-base-muted">Sem descrição.</p>
+              <p className="text-xs text-base-muted">Sem descrição.{isSocio && ' Use “Editar” para adicionar.'}</p>
             )}
           </div>
+        </div>
 
-          {isWeekly ? (
-            /* Numa semanal, mostramos as Tasks diárias ligadas (geridas no projeto) */
-            <div className="card rounded-md p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-base-primary">Tasks diárias</h3>
-                  {children.length > 0 && (
-                    <span className="text-xs font-num text-base-muted">{childDone}/{children.length}</span>
-                  )}
-                </div>
-                {project && (
-                  <Link to={`/projetos/${project.id}`} className="text-xs text-viper-500 hover:text-viper-400 font-mono transition-colors">
-                    gerir no projeto →
-                  </Link>
-                )}
-              </div>
-              {children.length === 0 ? (
-                <p className="text-xs text-base-muted">Nenhuma task diária ligada. Crie a partir do projeto.</p>
-              ) : (
-                <div className="space-y-1">
-                  {children.map((c) => (
-                    <Link key={c.id} to={`/atividades/${c.id}`} className="flex items-center gap-2.5 py-1.5 -mx-1 px-1 rounded-sm hover:bg-subtle transition-colors">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${c.status === 'concluida' ? 'bg-success' : c.status === 'em_andamento' ? 'bg-info' : 'bg-neutral-400'}`} />
-                      <span className={`text-sm flex-1 truncate ${c.status === 'concluida' ? 'line-through text-base-muted' : 'text-base-secondary'}`}>{c.title}</span>
-                      <StatusBadge status={c.status} />
-                    </Link>
-                  ))}
-                </div>
+        {isWeekly ? (
+          /* Semanal: lista as diárias ligadas (geridas no projeto) */
+          <div className="card rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <SectionTitle icon={<Target size={13} />} label="Tasks diárias" count={children.length > 0 ? `${childDone}/${children.length}` : undefined} />
+              {project && (
+                <Link to={`/projetos/${project.id}`} className="text-xs text-viper-500 hover:text-viper-400 font-mono transition-colors">
+                  gerir no projeto →
+                </Link>
               )}
             </div>
-          ) : (
-            /* Numa diária, as subtarefas (minitasks) */
-            <div className="card rounded-md p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-base-primary">Subtarefas</h3>
-                  {task.subtasks.length > 0 && (
-                    <span className="text-xs font-num text-base-muted">{doneSubtasks}/{task.subtasks.length}</span>
-                  )}
-                </div>
-                {isSocio && (
-                  <Button variant="tertiary" size="sm" onClick={() => { setNewSubtask(''); setShowSubModal(true); }}>
-                    <Plus size={13} /> Nova subtarefa
-                  </Button>
-                )}
-              </div>
-
+            {children.length === 0 ? (
+              <p className="text-xs text-base-muted">Nenhuma task diária ligada. Crie a partir do projeto.</p>
+            ) : (
               <div className="space-y-1">
-                {task.subtasks.map((sub) => (
-                  <div key={sub.id} className="flex items-center gap-2.5 py-1.5 group/sub">
-                    <button
-                      onClick={() => toggleSubtask(sub.id, sub.done)}
-                      disabled={!canEdit}
-                      className={`shrink-0 ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
-                    >
-                      {sub.done
-                        ? <CheckCircle2 size={16} className="text-success" />
-                        : <Circle size={16} className="text-neutral-400 hover:text-viper-500" />}
-                    </button>
-                    <span className={`text-sm flex-1 ${sub.done ? 'line-through text-base-muted' : 'text-base-secondary'}`}>
+                {children.map((c) => (
+                  <Link key={c.id} to={`/atividades/${c.id}`} className="flex items-center gap-2.5 py-1.5 -mx-1 px-1 rounded-md hover:bg-subtle transition-colors">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${c.status === 'concluida' ? 'bg-success' : c.status === 'em_andamento' ? 'bg-info' : 'bg-neutral-400'}`} />
+                    <span className={`text-sm flex-1 truncate ${c.status === 'concluida' ? 'line-through text-base-muted' : 'text-base-secondary'}`}>{c.title}</span>
+                    <StatusBadge status={c.status} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Diária: subtarefas clicáveis (popup de detalhe/edição) */
+          <div className="card rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <SectionTitle icon={<CheckCircle2 size={13} />} label="Subtarefas" count={totalSub > 0 ? `${doneSubtasks}/${totalSub}` : undefined} />
+              {isSocio && (
+                <Button variant="tertiary" size="sm" onClick={() => { setSubForm({ title: '', description: '' }); setShowSubModal(true); }}>
+                  <Plus size={13} /> Nova subtarefa
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-0.5">
+              {task.subtasks.map((sub) => (
+                <div key={sub.id} className="group/sub flex items-center gap-2.5 py-1.5 px-1.5 -mx-1.5 rounded-md hover:bg-subtle transition-colors">
+                  <button
+                    onClick={() => toggleSubtask(sub.id, sub.done)}
+                    disabled={!canEdit}
+                    title={sub.done ? 'Concluída' : 'Marcar como concluída'}
+                    className={`shrink-0 ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
+                    {sub.done
+                      ? <CheckCircle2 size={17} className="text-success" />
+                      : <Circle size={17} className="text-neutral-400 hover:text-viper-500" />}
+                  </button>
+
+                  {/* clique abre o popup com as informações */}
+                  <button onClick={() => openSubtask(sub)} className="flex-1 min-w-0 text-left flex items-center gap-2">
+                    <span className={`text-sm truncate ${sub.done ? 'line-through text-base-muted' : 'text-base-secondary group-hover/sub:text-base-primary'} transition-colors`}>
                       {sub.title}
                     </span>
-                    {isSocio && (
-                      <button
-                        onClick={() => deleteSubtask(sub.id)}
-                        className="opacity-0 group-hover/sub:opacity-100 p-0.5 rounded text-neutral-400 hover:text-danger transition-all"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {task.subtasks.length === 0 && (
-                  <p className="text-xs text-base-muted">Nenhuma subtarefa.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+                    {sub.description && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-viper-400" title="Tem descrição" />}
+                  </button>
 
-        {/* Sidebar column: specs */}
-        <div className="space-y-4">
-          <div className="card rounded-md p-5 space-y-4">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-base-muted">Especificações</h3>
+                  <ChevronRight size={14} className="shrink-0 text-base-muted opacity-0 group-hover/sub:opacity-100 transition-opacity" />
 
-            <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-1.5">Status</p>
-              <StatusBadge status={task.status} />
-            </div>
-
-            <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-1.5">Prioridade</p>
-              <StatusBadge status={task.priority} />
-            </div>
-
-            {task.period && (
-              <div>
-                <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-1.5">Período</p>
-                <Badge variant="primary">{task.period === 'semanal' ? 'Semanal' : 'Diária'}</Badge>
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-1.5">Prazo</p>
-              <div className="flex items-center gap-2 text-sm text-base-primary font-mono">
-                <CalendarClock size={14} className="text-viper-400" />
-                {formatDate(task.dueDate)}
-              </div>
-            </div>
-
-            {project && (
-              <div>
-                <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-1.5">Projeto</p>
-                <Link
-                  to={`/projetos/${project.id}`}
-                  className="flex items-center gap-2 text-sm text-viper-500 hover:text-viper-400 font-mono transition-colors"
-                >
-                  <FolderKanban size={14} />
-                  {project.name}
-                </Link>
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-2">
-                Responsável{assignees.length > 1 ? 'is' : ''}
-              </p>
-              <div className="space-y-2">
-                {assignees.map((a) => (
-                  <div key={a!.id} className="flex items-center gap-2">
-                    <Avatar user={a!} size={28} fontSize={10} />
-                    <span className="text-sm text-base-primary">{a!.name}</span>
-                  </div>
-                ))}
-              </div>
+                  {isSocio && (
+                    <button
+                      onClick={() => deleteSubtask(sub.id)}
+                      title="Excluir subtarefa"
+                      className="shrink-0 opacity-0 group-hover/sub:opacity-100 p-0.5 rounded text-neutral-400 hover:text-danger transition-all"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {totalSub === 0 && (
+                <p className="text-xs text-base-muted py-1">Nenhuma subtarefa.{isSocio && ' Adicione com “Nova subtarefa”.'}</p>
+              )}
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Nova subtarefa — popup pensado na atividade específica */}
+      {/* Popup de detalhe/edição de subtarefa */}
+      <Modal
+        open={!!openSub}
+        onClose={() => setOpenSub(null)}
+        title="Subtarefa"
+        size="sm"
+        footer={
+          subEditing ? (
+            <>
+              <Button variant="tertiary" onClick={() => setSubEditing(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={saveSubEdit} disabled={!subEditForm.title.trim() || saving}>
+                {saving ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </>
+          ) : (
+            <>
+              {isSocio && (
+                <Button variant="secondary" onClick={() => setSubEditing(true)}>
+                  <Pencil size={14} /> Editar
+                </Button>
+              )}
+              <Button variant="primary" onClick={() => setOpenSub(null)}>Fechar</Button>
+            </>
+          )
+        }
+      >
+        {openSub && (subEditing ? (
+          <div className="space-y-4">
+            <FormField label="Título" required>
+              <Input value={subEditForm.title} onChange={(e) => setSubEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus />
+            </FormField>
+            <FormField label="Descrição">
+              <Textarea value={subEditForm.description} onChange={(e) => setSubEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} placeholder="Detalhe a subtarefa..." />
+            </FormField>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              {openSub.done
+                ? <CheckCircle2 size={18} className="text-success shrink-0" />
+                : <Circle size={18} className="text-neutral-400 shrink-0" />}
+              <h3 className={`text-base font-semibold ${openSub.done ? 'line-through text-base-muted' : 'text-base-primary'}`}>{openSub.title}</h3>
+            </div>
+            <div>
+              <p className="text-xs font-mono uppercase tracking-wider text-base-muted mb-1">Descrição</p>
+              {openSub.description ? (
+                <p className="text-sm text-base-secondary leading-relaxed whitespace-pre-wrap">{openSub.description}</p>
+              ) : (
+                <p className="text-sm text-base-muted">Sem descrição.</p>
+              )}
+            </div>
+            {canEdit && (
+              <button
+                onClick={() => { toggleSubtask(openSub.id, openSub.done); setOpenSub(null); }}
+                className="text-xs font-medium text-viper-500 hover:text-viper-400 transition-colors"
+              >
+                {openSub.done ? 'Marcar como pendente' : 'Marcar como concluída'}
+              </button>
+            )}
+          </div>
+        ))}
+      </Modal>
+
+      {/* Nova subtarefa */}
       <Modal
         open={showSubModal}
         onClose={() => setShowSubModal(false)}
@@ -422,19 +600,73 @@ export function ActivityDetail() {
         footer={
           <>
             <Button variant="tertiary" onClick={() => setShowSubModal(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={addSubtask} disabled={!newSubtask.trim()}>Adicionar</Button>
+            <Button variant="primary" onClick={addSubtask} disabled={!subForm.title.trim() || saving}>Adicionar</Button>
           </>
         }
       >
-        <FormField label="Descrição da subtarefa" required>
-          <Input
-            autoFocus
-            value={newSubtask}
-            onChange={(e) => setNewSubtask(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
-            placeholder="Ex.: Validar formulário de login"
-          />
-        </FormField>
+        <div className="space-y-4">
+          <FormField label="Título da subtarefa" required>
+            <Input
+              autoFocus
+              value={subForm.title}
+              onChange={(e) => setSubForm((f) => ({ ...f, title: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
+              placeholder="Ex.: Validar formulário de login"
+            />
+          </FormField>
+          <FormField label="Descrição">
+            <Textarea value={subForm.description} onChange={(e) => setSubForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalhes da subtarefa (opcional)..." />
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* Editar task */}
+      <Modal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        title="Editar task"
+        size="md"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setShowEdit(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={saveEditTask} disabled={!editForm.title.trim() || saving}>
+              {saving ? 'Salvando…' : 'Salvar alterações'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Título" required>
+            <Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus />
+          </FormField>
+          <FormField label="Descrição">
+            <Textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Descreva o que precisa ser feito..." />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Prioridade">
+              <Select value={editForm.priority} onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value as TaskPriority }))}>
+                <option value="baixa">Baixa</option>
+                <option value="media">Média</option>
+                <option value="alta">Alta</option>
+              </Select>
+            </FormField>
+            <FormField label="Prazo">
+              <Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
+            </FormField>
+          </div>
+          <FormField label="Responsáveis" hint="Selecione até 2 responsáveis">
+            <AssigneePicker
+              users={users}
+              value={editForm.assignedTo}
+              onToggle={(uid) => setEditForm((f) => ({
+                ...f,
+                assignedTo: f.assignedTo.includes(uid)
+                  ? f.assignedTo.filter((x) => x !== uid)
+                  : f.assignedTo.length < 2 ? [...f.assignedTo, uid] : f.assignedTo,
+              }))}
+            />
+          </FormField>
+        </div>
       </Modal>
 
       {/* Confirmar exclusão */}

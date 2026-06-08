@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Plus, ExternalLink, User, FileText, CalendarDays, Clock, Target, CheckCircle2, Trash2, ArrowRight, Pencil,
+  ListChecks, ArrowUp, ArrowDown, Check,
 } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
@@ -15,9 +16,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useProject, useTasks, useUsers } from '../lib/hooks';
 import {
-  addProjectNote, addProjectDoc, updateProject, updateProjectCompletion, createTask, deleteProject,
+  addProjectNote, addProjectDoc, updateProject, createTask, deleteProject,
+  addProjectObjective, updateProjectObjective, toggleProjectObjective, deleteProjectObjective,
+  reorderProjectObjectives,
 } from '../lib/api';
-import { User as TeamUser, ProjectStatus, TaskPriority } from '../mocks/data';
+import { User as TeamUser, ProjectStatus, TaskPriority, ProjectObjective } from '../mocks/data';
 
 // Roxo vibrante/neon usado nos acentos desta página (melhor visibilidade).
 const VIBRANT = '#A855F7';
@@ -53,15 +56,17 @@ interface DailyFormData {
 interface EditFormData {
   name: string; client: string; status: ProjectStatus; stack: string;
   startDate: string; endDate: string; description: string; responsibles: string[];
-  completionTitle: string; completionDescription: string;
+}
+interface ObjectiveFormData {
+  title: string; description: string;
 }
 
 const defaultWeekly: WeeklyFormData = { title: '', assignedTo: [], priority: 'media', dueDate: '' };
 const defaultDaily: DailyFormData = { title: '', description: '', assignedTo: [], priority: 'media', dueDate: '', parentTaskId: '' };
 const defaultEdit: EditFormData = {
   name: '', client: '', status: 'Ativo', stack: '', startDate: '', endDate: '', description: '', responsibles: [],
-  completionTitle: '', completionDescription: '',
 };
+const defaultObjective: ObjectiveFormData = { title: '', description: '' };
 
 // linha de seleção de responsáveis (máx. 2) reutilizável
 function AssigneePicker({ value, onToggle, users }: { value: string[]; onToggle: (id: string) => void; users: TeamUser[] }) {
@@ -110,6 +115,18 @@ export function ProjectDetail() {
   const [dailyForm, setDailyForm] = useState<DailyFormData>(defaultDaily);
   const [saving, setSaving] = useState(false);
 
+  // Objetivos: cópia local p/ marcar/reordenar com resposta imediata; persiste em background.
+  const [objectives, setObjectives] = useState<ProjectObjective[]>([]);
+  const [showObjectiveModal, setShowObjectiveModal] = useState(false);
+  const [objectiveForm, setObjectiveForm] = useState<ObjectiveFormData>(defaultObjective);
+  // Objetivo aberto no popup de detalhe/edição (null = fechado).
+  const [openObjective, setOpenObjective] = useState<ProjectObjective | null>(null);
+  const [objEdit, setObjEdit] = useState<ObjectiveFormData>(defaultObjective);
+
+  useEffect(() => {
+    setObjectives(project?.objectives ?? []);
+  }, [project]);
+
   if (loading) {
     return (
       <Layout title="Carregando…">
@@ -138,13 +155,12 @@ export function ProjectDetail() {
   // Diárias de uma semanal específica e diárias avulsas (legado, sem semanal).
   const dailiesFor = (weeklyId: string) => dailyTasks.filter((d) => d.parentTaskId === weeklyId);
   const orphanDailies = dailyTasks.filter((d) => !d.parentTaskId || !weeklyTasks.some((w) => w.id === d.parentTaskId));
-  const weeklyDone = weeklyTasks.filter((t) => t.status === 'concluida').length;
-  // Escala: papel quente (0/0), vermelho <45%, roxo <75%, verde >=75%
-  const completion = progressState(weeklyDone, weeklyTasks.length);
-  const completionPct = completion.pct;
-  const completionEmpty = completion.empty;
-  const completionDone = !completion.empty && weeklyDone === weeklyTasks.length;
-  const completionColor = completion.color;
+  // Progresso dos objetivos (checklist próprio): papel quente (0/0), vermelho <45%, roxo <75%, verde >=75%.
+  const objDone = objectives.filter((o) => o.done).length;
+  const objProgress = progressState(objDone, objectives.length);
+  const objAllDone = !objProgress.empty && objDone === objectives.length;
+  // Verde escuro usado no checkbox marcado.
+  const DARK_GREEN = '#15803D';
 
   // ---- handlers ----
   const handleDeleteProject = async () => {
@@ -182,8 +198,6 @@ export function ProjectDetail() {
       endDate: project.endDate,
       description: project.description,
       responsibles: project.responsibles,
-      completionTitle: project.completion?.title ?? '',
-      completionDescription: project.completion?.description ?? '',
     });
     setShowEditModal(true);
   };
@@ -212,12 +226,86 @@ export function ProjectDetail() {
         description: editForm.description,
         responsibles: editForm.responsibles,
       });
-      if (editForm.completionTitle.trim()) {
-        await updateProjectCompletion(id, editForm.completionTitle.trim(), editForm.completionDescription.trim());
-      }
       setShowEditModal(false);
       reloadProject();
       toast.success('Alteração salva com sucesso.');
+    } catch {
+      toast.error('Não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ---- objetivos (checklist) ----
+  const createObjective = async () => {
+    if (!objectiveForm.title.trim() || !id || saving) return;
+    setSaving(true);
+    try {
+      await addProjectObjective(id, objectiveForm.title.trim(), objectiveForm.description.trim(), objectives.length);
+      setObjectiveForm(defaultObjective);
+      setShowObjectiveModal(false);
+      reloadProject();
+      toast.success('Objetivo adicionado.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Causa típica: a tabela project_objectives ainda não existe (migration pendente).
+      toast.error(`Não foi possível salvar o objetivo: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Marca/desmarca com atualização otimista; persiste em background.
+  const toggleObjective = (obj: ProjectObjective) => {
+    const next = !obj.done;
+    setObjectives((list) => list.map((o) => (o.id === obj.id ? { ...o, done: next } : o)));
+    toggleProjectObjective(obj.id, next).catch(() => {
+      setObjectives((list) => list.map((o) => (o.id === obj.id ? { ...o, done: obj.done } : o)));
+      toast.error('Não foi possível atualizar o objetivo.');
+    });
+  };
+
+  // Move um objetivo para cima/baixo e persiste a nova ordem.
+  const moveObjective = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= objectives.length) return;
+    const next = objectives.slice();
+    [next[index], next[target]] = [next[target], next[index]];
+    setObjectives(next);
+    reorderProjectObjectives(next.map((o) => o.id)).catch(() => {
+      toast.error('Não foi possível reordenar.');
+      reloadProject();
+    });
+  };
+
+  const removeObjective = async (objId: string) => {
+    setObjectives((list) => list.filter((o) => o.id !== objId));
+    if (openObjective?.id === objId) setOpenObjective(null);
+    try {
+      await deleteProjectObjective(objId);
+    } catch {
+      toast.error('Não foi possível excluir o objetivo.');
+      reloadProject();
+    }
+  };
+
+  // Abre o popup de detalhe e pré-carrega os campos de edição.
+  const openObjectiveDetail = (obj: ProjectObjective) => {
+    setOpenObjective(obj);
+    setObjEdit({ title: obj.title, description: obj.description ?? '' });
+  };
+
+  const saveObjectiveEdit = async () => {
+    if (!openObjective || !objEdit.title.trim() || saving) return;
+    setSaving(true);
+    try {
+      await updateProjectObjective(openObjective.id, {
+        title: objEdit.title.trim(),
+        description: objEdit.description.trim() || null,
+      });
+      setOpenObjective(null);
+      reloadProject();
+      toast.success('Objetivo atualizado.');
     } catch {
       toast.error('Não foi possível salvar.');
     } finally {
@@ -367,62 +455,115 @@ export function ProjectDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Coluna principal: conclusão + entregas + diárias */}
         <div className="lg:col-span-2 space-y-5">
-          {/* OBJETIVO */}
+          {/* OBJETIVOS — checklist do projeto (reordenável; clique abre o detalhe) */}
           <div
             className="rounded-md p-5"
             style={{
               backgroundColor: 'var(--surface)',
-              // Sem atividades, a cor é uma CSS var (papel quente) e usa tints prontas em vez de sufixo de alfa.
-              backgroundImage: `linear-gradient(135deg, ${completionEmpty ? 'var(--papel-quente-soft)' : `${completionColor}14`}, transparent 55%)`,
+              // Sem objetivos, a cor é papel quente; com objetivos segue a escala de progresso.
+              backgroundImage: `linear-gradient(135deg, ${objProgress.empty ? 'var(--papel-quente-soft)' : `${objProgress.color}14`}, transparent 55%)`,
               border: '1px solid var(--border)',
               boxShadow: 'var(--card-shadow)',
             }}
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <span className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: completionEmpty ? 'var(--papel-quente-tint)' : `${completionColor}22`, color: completionColor }}>
-                  <Target size={15} />
+                <span className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: objProgress.empty ? 'var(--papel-quente-tint)' : `${objProgress.color}22`, color: objProgress.empty ? 'var(--papel-quente)' : objProgress.color }}>
+                  <ListChecks size={15} />
                 </span>
-                <span className="text-xs font-mono uppercase tracking-widest text-base-muted">Objetivo</span>
+                <span className="text-xs font-mono uppercase tracking-widest text-base-muted">Objetivos</span>
+                {objectives.length > 0 && (
+                  <span className="text-xs font-num text-base-muted">· {objDone}/{objectives.length}</span>
+                )}
               </div>
-              {project.completion && (completionDone ? (
-                <span className="shrink-0 inline-flex items-center gap-1 text-xs font-mono font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#15BB7722', color: '#15BB77' }}>
-                  <CheckCircle2 size={12} /> Concluído
-                </span>
-              ) : (
-                <span className="shrink-0 text-xs font-mono font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: `${VIBRANT}22`, color: VIBRANT }}>
-                  Em andamento
-                </span>
-              ))}
+              <div className="flex items-center gap-2">
+                {objAllDone && (
+                  <span className="shrink-0 inline-flex items-center gap-1 text-xs font-mono font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#15BB7722', color: '#15BB77' }}>
+                    <CheckCircle2 size={12} /> Concluídos
+                  </span>
+                )}
+                {isSocio && (
+                  <Button variant="tertiary" size="sm" onClick={() => { setObjectiveForm(defaultObjective); setShowObjectiveModal(true); }}>
+                    <Plus size={13} /> Objetivo
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {project.completion ? (
-              <>
-                <h3 className="text-lg font-bold text-base-primary leading-snug">{project.completion.title}</h3>
-                {project.completion.description && (
-                  <p className="mt-1 text-sm text-base-secondary block w-full leading-relaxed">{project.completion.description}</p>
-                )}
-
-                {project.completion && (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-base-muted">{weeklyDone}/{weeklyTasks.length} entregas semanais concluídas</span>
-                      {completionEmpty ? (
-                        <span className="text-xs font-semibold" style={{ color: completionColor }}>Aguarde por novas atividades</span>
-                      ) : (
-                        <span className="text-sm font-bold font-num" style={{ color: completionColor }}>{completionPct}%</span>
-                      )}
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-                      <div className="h-full rounded-full" style={{ width: completionEmpty ? '100%' : `${completionPct}%`, backgroundColor: completionColor, opacity: completionEmpty ? 0.35 : 1, transition: 'width 0.6s ease' }} />
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
+            {objectives.length === 0 ? (
               <div className="text-center py-4">
-                <p className="text-sm text-base-muted">Nenhum objetivo definido para este projeto.</p>
+                <p className="text-sm text-base-muted">
+                  Nenhum objetivo definido.{isSocio && ' Adicione metas para acompanhar o projeto.'}
+                </p>
               </div>
+            ) : (
+              <>
+                <ul className="space-y-1">
+                  {objectives.map((obj, i) => (
+                    <li key={obj.id} className="group flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-subtle">
+                      {/* Checkbox quadrado: papel quente → verde escuro ao marcar */}
+                      <button
+                        type="button"
+                        onClick={() => isSocio && toggleObjective(obj)}
+                        disabled={!isSocio}
+                        aria-pressed={obj.done}
+                        title={obj.done ? 'Concluído' : 'Marcar como concluído'}
+                        className="shrink-0 w-5 h-5 rounded-[5px] flex items-center justify-center transition-all duration-150 disabled:cursor-default"
+                        style={obj.done
+                          ? { backgroundColor: DARK_GREEN, border: `1px solid ${DARK_GREEN}` }
+                          : { backgroundColor: 'var(--papel-quente-tint)', border: '1px solid var(--papel-quente)' }}
+                      >
+                        {obj.done && <Check size={13} strokeWidth={3} className="text-white" />}
+                      </button>
+
+                      {/* Título — clique abre o popup de detalhe */}
+                      <button type="button" onClick={() => openObjectiveDetail(obj)} className="flex-1 min-w-0 text-left">
+                        <span
+                          className={`text-sm font-medium truncate block transition-colors ${obj.done ? 'line-through' : 'text-base-primary group-hover:text-viper-500'}`}
+                          style={obj.done ? { color: DARK_GREEN } : undefined}
+                        >
+                          {obj.title}
+                        </span>
+                      </button>
+
+                      {obj.description && (
+                        <span className="shrink-0 text-base-muted opacity-60" title="Tem descrição">
+                          <FileText size={12} />
+                        </span>
+                      )}
+
+                      {/* Ações — reordenar/excluir (somente sócio) */}
+                      {isSocio && (
+                        <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          <button type="button" onClick={() => moveObjective(i, -1)} disabled={i === 0} title="Mover para cima"
+                            className="p-1 rounded text-base-muted hover:text-base-primary hover:bg-surface2 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                            <ArrowUp size={14} />
+                          </button>
+                          <button type="button" onClick={() => moveObjective(i, 1)} disabled={i === objectives.length - 1} title="Mover para baixo"
+                            className="p-1 rounded text-base-muted hover:text-base-primary hover:bg-surface2 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                            <ArrowDown size={14} />
+                          </button>
+                          <button type="button" onClick={() => removeObjective(obj.id)} title="Excluir objetivo"
+                            className="p-1 rounded text-base-muted hover:text-danger hover:bg-danger/10 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Progresso dos objetivos */}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-base-muted">{objDone}/{objectives.length} objetivos concluídos</span>
+                    <span className="text-sm font-bold font-num" style={{ color: objProgress.color }}>{objProgress.pct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${objProgress.pct}%`, backgroundColor: objProgress.color, transition: 'width 0.6s ease' }} />
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -785,18 +926,76 @@ export function ProjectDetail() {
             </div>
           </FormField>
 
-          <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-            <p className="text-xs font-mono uppercase tracking-widest text-base-muted mb-3 mt-3">Objetivo</p>
-            <div className="space-y-4">
-              <FormField label="Título do objetivo">
-                <Input value={editForm.completionTitle} onChange={(e) => setEditForm((f) => ({ ...f, completionTitle: e.target.value }))} placeholder="Ex.: Entregar o MVP funcional" />
-              </FormField>
-              <FormField label="Descrição do objetivo">
-                <Textarea value={editForm.completionDescription} onChange={(e) => setEditForm((f) => ({ ...f, completionDescription: e.target.value }))} rows={2} placeholder="Detalhe o objetivo principal do projeto..." />
-              </FormField>
-            </div>
-          </div>
+          <p className="text-xs text-base-muted pt-1">
+            Os objetivos do projeto são gerenciados pelo checklist na seção “Objetivos”.
+          </p>
         </div>
+      </Modal>
+
+      {/* Novo objetivo — popup com título e descrição */}
+      <Modal
+        open={showObjectiveModal}
+        onClose={() => setShowObjectiveModal(false)}
+        title="Novo objetivo"
+        description="Uma meta do projeto. Marque no checklist quando for concluída."
+        size="sm"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setShowObjectiveModal(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={createObjective} disabled={!objectiveForm.title.trim() || saving}>
+              {saving ? 'Salvando…' : 'Adicionar objetivo'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Título" required>
+            <Input value={objectiveForm.title} onChange={(e) => setObjectiveForm((f) => ({ ...f, title: e.target.value }))} placeholder="Ex.: Entregar o MVP funcional" autoFocus />
+          </FormField>
+          <FormField label="Descrição">
+            <Textarea value={objectiveForm.description} onChange={(e) => setObjectiveForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalhe o que precisa ser alcançado..." />
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* Detalhe do objetivo — título + descrição (edição p/ sócio) */}
+      <Modal
+        open={!!openObjective}
+        onClose={() => setOpenObjective(null)}
+        title="Objetivo"
+        size="sm"
+        footer={
+          isSocio ? (
+            <>
+              <Button variant="tertiary" onClick={() => setOpenObjective(null)}>Fechar</Button>
+              <Button variant="primary" onClick={saveObjectiveEdit} disabled={!objEdit.title.trim() || saving}>
+                {saving ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </>
+          ) : (
+            <Button variant="tertiary" onClick={() => setOpenObjective(null)}>Fechar</Button>
+          )
+        }
+      >
+        {openObjective && (isSocio ? (
+          <div className="space-y-4">
+            <FormField label="Título" required>
+              <Input value={objEdit.title} onChange={(e) => setObjEdit((f) => ({ ...f, title: e.target.value }))} autoFocus />
+            </FormField>
+            <FormField label="Descrição">
+              <Textarea value={objEdit.description} onChange={(e) => setObjEdit((f) => ({ ...f, description: e.target.value }))} rows={4} placeholder="Sem descrição." />
+            </FormField>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <h3 className="text-base font-semibold text-base-primary">{openObjective.title}</h3>
+            {openObjective.description ? (
+              <p className="text-sm text-base-secondary leading-relaxed whitespace-pre-wrap">{openObjective.description}</p>
+            ) : (
+              <p className="text-sm text-base-muted">Sem descrição.</p>
+            )}
+          </div>
+        ))}
       </Modal>
 
       {/* Confirmar exclusão do projeto */}

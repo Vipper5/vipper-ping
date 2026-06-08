@@ -19,6 +19,15 @@ export interface User {
 
 export type ProjectStatus = 'Ativo' | 'Pausado' | 'Concluído';
 
+// Objetivo do projeto — item de um checklist reordenável.
+export interface ProjectObjective {
+  id: string;
+  title: string;
+  description?: string;
+  done: boolean;
+  position: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -31,8 +40,8 @@ export interface Project {
   description: string;
   docs: { title: string; url: string; addedAt: string }[];
   notes: { id: string; text: string; author: string; createdAt: string }[];
-  // Task de Conclusão — objetivo principal do projeto, alcançado pelas entregas semanais
-  completion?: { title: string; description?: string };
+  // Objetivos do projeto — checklist de metas (ver project_objectives).
+  objectives: ProjectObjective[];
 }
 
 export type TaskStatus = 'pendente' | 'em_andamento' | 'concluida';
@@ -42,6 +51,7 @@ export type TaskPeriod = 'diaria' | 'semanal';
 export interface Subtask {
   id: string;
   title: string;
+  description?: string;
   done: boolean;
 }
 

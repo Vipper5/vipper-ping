@@ -62,6 +62,26 @@ export async function fetchUsers(): Promise<User[]> {
 const PROJECT_SELECT =
   '*, project_responsibles(profile_id), project_docs(*), project_notes(*)';
 
+// Os objetivos vêm numa consulta separada (não embutida) para que a página de
+// projetos continue funcionando mesmo que a tabela project_objectives ainda não
+// exista (migration pendente). Em qualquer erro, devolve lista vazia.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function fetchObjectivesByProject(projectIds: string[]): Promise<Record<string, any[]>> {
+  if (projectIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('project_objectives')
+    .select('*')
+    .in('project_id', projectIds);
+  if (error || !data) return {};
+  const byProject: Record<string, any[]> = {};
+  for (const o of data) {
+    if (!byProject[o.project_id]) byProject[o.project_id] = [];
+    byProject[o.project_id].push(o);
+  }
+  return byProject;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapProject(row: any): Project {
   return {
@@ -80,9 +100,15 @@ function mapProject(row: any): Project {
     notes: (row.project_notes ?? [])
       .map((n: any) => ({ id: n.id, text: n.text, author: n.author_id ?? '', createdAt: n.created_at }))
       .sort((a: any, b: any) => a.createdAt.localeCompare(b.createdAt)),
-    completion: row.completion_title
-      ? { title: row.completion_title, description: row.completion_description ?? undefined }
-      : undefined,
+    objectives: (row.project_objectives ?? [])
+      .map((o: any) => ({
+        id: o.id,
+        title: o.title,
+        description: o.description ?? undefined,
+        done: o.done,
+        position: o.position,
+      }))
+      .sort((a: any, b: any) => a.position - b.position),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -93,7 +119,9 @@ export async function fetchProjects(): Promise<Project[]> {
     .select(PROJECT_SELECT)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(mapProject);
+  const rows = data ?? [];
+  const objs = await fetchObjectivesByProject(rows.map((r) => r.id));
+  return rows.map((r) => mapProject({ ...r, project_objectives: objs[r.id] ?? [] }));
 }
 
 export async function fetchProject(id: string): Promise<Project | null> {
@@ -103,7 +131,9 @@ export async function fetchProject(id: string): Promise<Project | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return data ? mapProject(data) : null;
+  if (!data) return null;
+  const objs = await fetchObjectivesByProject([id]);
+  return mapProject({ ...data, project_objectives: objs[id] ?? [] });
 }
 
 export interface ProjectInput {
@@ -184,16 +214,53 @@ export async function addProjectDoc(projectId: string, title: string, url: strin
   if (error) throw error;
 }
 
-export async function updateProjectCompletion(
+// ------------------------------------------------------------------
+// Objetivos do projeto (checklist)
+// ------------------------------------------------------------------
+
+export async function addProjectObjective(
   projectId: string,
   title: string,
   description: string,
+  position: number,
 ): Promise<void> {
   const { error } = await supabase
-    .from('projects')
-    .update({ completion_title: title, completion_description: description || null })
-    .eq('id', projectId);
+    .from('project_objectives')
+    .insert({ project_id: projectId, title, description: description || null, position });
   if (error) throw error;
+}
+
+export async function updateProjectObjective(
+  objectiveId: string,
+  fields: { title?: string; description?: string | null; done?: boolean; position?: number },
+): Promise<void> {
+  const { error } = await supabase
+    .from('project_objectives')
+    .update(fields)
+    .eq('id', objectiveId);
+  if (error) throw error;
+}
+
+export async function toggleProjectObjective(objectiveId: string, done: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('project_objectives')
+    .update({ done })
+    .eq('id', objectiveId);
+  if (error) throw error;
+}
+
+export async function deleteProjectObjective(objectiveId: string): Promise<void> {
+  const { error } = await supabase.from('project_objectives').delete().eq('id', objectiveId);
+  if (error) throw error;
+}
+
+/** Persiste a nova ordem dos objetivos (position = índice na lista). */
+export async function reorderProjectObjectives(orderedIds: string[]): Promise<void> {
+  await Promise.all(
+    orderedIds.map((id, position) =>
+      supabase.from('project_objectives').update({ position }).eq('id', id),
+    ),
+  );
 }
 
 // ------------------------------------------------------------------
@@ -221,7 +288,7 @@ function mapTask(row: any): Task {
     subtasks: (row.subtasks ?? [])
       .slice()
       .sort((a: any, b: any) => a.position - b.position)
-      .map((s: any) => ({ id: s.id, title: s.title, done: s.done })),
+      .map((s: any) => ({ id: s.id, title: s.title, description: s.description ?? undefined, done: s.done })),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -362,10 +429,24 @@ export async function toggleSubtask(subtaskId: string, done: boolean): Promise<v
   if (error) throw error;
 }
 
-export async function addSubtask(taskId: string, title: string, position: number): Promise<void> {
+export async function addSubtask(
+  taskId: string,
+  title: string,
+  position: number,
+  description?: string,
+): Promise<void> {
   const { error } = await supabase
     .from('subtasks')
-    .insert({ task_id: taskId, title, position });
+    .insert({ task_id: taskId, title, position, description: description?.trim() || null });
+  if (error) throw error;
+}
+
+/** Edita o conteúdo de uma subtarefa (título e/ou descrição). */
+export async function updateSubtask(
+  subtaskId: string,
+  fields: { title?: string; description?: string | null },
+): Promise<void> {
+  const { error } = await supabase.from('subtasks').update(fields).eq('id', subtaskId);
   if (error) throw error;
 }
 

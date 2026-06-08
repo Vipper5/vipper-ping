@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, Pencil, CalendarClock } from 'lucide-react';
+import { Plus, ArrowRight, Pencil, CalendarClock, ListChecks, Target } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/Badge';
@@ -36,13 +36,22 @@ function daysUntil(d: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
-// Cor do prazo: neutra por padrão, quente só quando realmente urgente
-function deadlineColor(endDate: string, status: ProjectStatus): string {
-  if (status === 'Concluído') return 'var(--text-muted)';
+// Cor de acento do card por status do projeto.
+const STATUS_ACCENT: Record<ProjectStatus, string> = {
+  Ativo: '#15BB77',
+  Pausado: '#F5AE39',
+  'Concluído': '#5294E6',
+};
+
+// Metadados do prazo: cor + rótulo (relativo quando urgente, data caso contrário).
+function deadlineMeta(endDate: string, status: ProjectStatus): { color: string; label: string; urgent: boolean } {
+  if (!endDate) return { color: 'var(--text-muted)', label: '—', urgent: false };
+  if (status === 'Concluído') return { color: 'var(--text-muted)', label: 'Entregue', urgent: false };
   const days = daysUntil(endDate);
-  if (days < 0) return '#E54056';
-  if (days <= 7) return '#F5AE39';
-  return 'var(--text-muted)';
+  if (days < 0) return { color: '#E54056', label: `${Math.abs(days)}d em atraso`, urgent: true };
+  if (days === 0) return { color: '#E54056', label: 'Entrega hoje', urgent: true };
+  if (days <= 7) return { color: '#F5AE39', label: `Faltam ${days}d`, urgent: true };
+  return { color: 'var(--text-muted)', label: formatDate(endDate), urgent: false };
 }
 
 function projectStats(projectId: string, allTasks: Task[]) {
@@ -278,17 +287,23 @@ export function Projects() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((project) => {
             const st = projectStats(project.id, tasks);
-            const dColor = deadlineColor(project.endDate, project.status);
+            const dl = deadlineMeta(project.endDate, project.status);
+            const accent = STATUS_ACCENT[project.status] ?? '#8637CC';
+            const objTotal = project.objectives.length;
+            const objDone = project.objectives.filter((o) => o.done).length;
             return (
               <Link
                 key={project.id}
                 to={`/projetos/${project.id}`}
-                className="group card-interactive rounded-md p-5 flex flex-col"
+                className="group relative card-interactive rounded-xl overflow-hidden p-5 pl-6 flex flex-col"
               >
+                {/* Acento lateral por status */}
+                <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: accent }} />
+
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-mono font-semibold text-base-primary text-sm truncate group-hover:text-viper-500 transition-colors">
+                    <p className="font-mono font-semibold text-base-primary text-[15px] truncate group-hover:text-viper-500 transition-colors">
                       {project.name}
                     </p>
                     <p className="text-xs text-base-muted mt-0.5 truncate">{project.client}</p>
@@ -298,6 +313,7 @@ export function Projects() {
                     {isSocio && (
                       <button
                         onClick={(e) => openEdit(project, e)}
+                        title="Editar projeto"
                         className="p-1 rounded text-base-muted hover:text-viper-500 hover:bg-viper-50 dark:hover:bg-carvao-surface2 transition-colors opacity-0 group-hover:opacity-100"
                       >
                         <Pencil size={13} />
@@ -306,18 +322,46 @@ export function Projects() {
                   </div>
                 </div>
 
-                {/* Progresso */}
-                <div className="mt-6">
+                {/* Stack */}
+                {project.stack.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {project.stack.slice(0, 4).map((s) => (
+                      <span
+                        key={s}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--text-muted)' }}
+                      >
+                        {s}
+                      </span>
+                    ))}
+                    {project.stack.length > 4 && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
+                        +{project.stack.length - 4}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Progresso (empurrado para a base p/ alinhar os cards) */}
+                <div className="mt-auto pt-5">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-base-muted">{st.done}/{st.total} tarefas</span>
-                    <span className="text-xs font-mono font-semibold text-base-primary">{st.pct}%</span>
+                    <span className="inline-flex items-center gap-1.5 text-xs text-base-muted">
+                      <ListChecks size={13} /> {st.done}/{st.total} tarefas
+                    </span>
+                    <span className="text-sm font-num font-bold" style={{ color: accent }}>{st.pct}%</span>
                   </div>
                   <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
                     <div
-                      className="h-full rounded-full bg-viper-500"
-                      style={{ width: `${st.pct}%`, transition: 'width 0.6s ease' }}
+                      className="h-full rounded-full"
+                      style={{ width: `${st.pct}%`, backgroundColor: accent, transition: 'width 0.6s ease' }}
                     />
                   </div>
+                  {objTotal > 0 && (
+                    <div className="flex items-center gap-1.5 mt-2 text-xs text-base-muted">
+                      <Target size={12} className="text-viper-400" />
+                      <span>{objDone}/{objTotal} objetivos</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer */}
@@ -327,11 +371,18 @@ export function Projects() {
                 >
                   <Avatars ids={project.responsibles} users={users} />
                   <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 text-xs font-mono" style={{ color: dColor }}>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs font-mono font-medium px-2 py-1 rounded-full"
+                      style={
+                        dl.urgent
+                          ? { backgroundColor: `${dl.color}1f`, color: dl.color }
+                          : { color: dl.color }
+                      }
+                    >
                       <CalendarClock size={12} />
-                      {formatDate(project.endDate)}
+                      {dl.label}
                     </span>
-                    <ArrowRight size={14} className="text-viper-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight size={14} className="text-viper-500 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all" />
                   </div>
                 </div>
               </Link>
