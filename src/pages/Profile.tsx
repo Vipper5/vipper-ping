@@ -11,6 +11,19 @@ import { Camera, Save, User, Sun, CalendarRange, ExternalLink, CheckCheck } from
 
 const STATUS_RANK: Record<string, number> = { em_andamento: 0, pendente: 1, concluida: 2 };
 
+function formatPhone(raw: string): string {
+  // Se já tem o prefixo +55, remove-o para trabalhar apenas com os dígitos locais
+  const stripped = raw.startsWith('+55') ? raw.slice(3) : raw;
+  // Mantém apenas dígitos, limitado a 12 (DDD 2 + número até 10)
+  const digits = stripped.replace(/\D/g, '').slice(0, 12);
+  if (!digits) return '';
+  const ddd = digits.slice(0, 2);
+  const num = digits.slice(2);
+  if (digits.length <= 2) return `+55 (${ddd}`;
+  if (num.length < 5) return `+55 (${ddd}) ${num}`;
+  return `+55 (${ddd}) ${num.slice(0, 5)}-${num.slice(5)}`;
+}
+
 export function Profile() {
   const { user, updateProfile } = useAuth();
   const { data: tasks } = useTasks();
@@ -165,10 +178,12 @@ export function Profile() {
 
             <FormField label="Telefone">
               <Input
-                type="tel"
+                type="text"
+                inputMode="numeric"
                 value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="+55 11 99999-9999"
+                onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
+                placeholder="+55 (11) 99999-9999"
+                maxLength={21}
               />
             </FormField>
           </div>
