@@ -23,8 +23,12 @@ export function progressColor(pct: number): string {
  * Estado de uma barra de progresso considerando a possibilidade de 0/0.
  * Quando não há atividades, devolve `empty: true` para que a UI mostre
  * "Aguarde por novas atividades" com a cor de papel quente.
+ * Se `isDone` for true (task/projeto já concluído), sempre retorna 100%.
  */
-export function progressState(done: number, total: number) {
+export function progressState(done: number, total: number, isDone = false) {
+  if (isDone) {
+    return { empty: false, pct: 100, color: progressColor(100), label: '100%' };
+  }
   if (total === 0) {
     return { empty: true, pct: 0, color: PAPEL_QUENTE, label: NO_ACTIVITY_LABEL };
   }

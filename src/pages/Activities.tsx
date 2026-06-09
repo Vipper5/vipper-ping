@@ -76,7 +76,7 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
   // Num projeto, o progresso vem das tasks ligadas (mesmo critério do cliente/detalhe).
   const dailies = isWeekly ? tasks.filter((t) => t.parentTaskId === task.id) : [];
   const dailiesDone = dailies.filter((d) => d.status === 'concluida').length;
-  const weekProg = progressState(dailiesDone, dailies.length);
+  const weekProg = progressState(dailiesDone, dailies.length, task.status === 'concluida');
 
   return (
     <Link

@@ -63,6 +63,7 @@ interface NewForm {
   members: string[];
   priority: TaskPriority;
   projectId: string;
+  parentTaskId: string;
   time: string;
   description: string;
   note: string;
@@ -70,7 +71,7 @@ interface NewForm {
   link: string;
 }
 const emptyForm: NewForm = {
-  type: 'tarefa', title: '', members: [], priority: 'media', projectId: '', time: '',
+  type: 'tarefa', title: '', members: [], priority: 'media', projectId: '', parentTaskId: '', time: '',
   description: '', note: '', location: '', link: '',
 };
 
@@ -103,6 +104,7 @@ export function Agenda() {
   const [form, setForm] = useState<NewForm>(emptyForm);
 
   const isSocio = user?.role === 'socio';
+  const [filterMember, setFilterMember] = useState<string>(user?.id ?? 'all');
 
   // Fecha o painel lateral do dia com Esc.
   useEffect(() => {
@@ -118,13 +120,15 @@ export function Agenda() {
   const getUserName = (uid: string) => users.find((u) => u.id === uid)?.name ?? uid;
   const getProjectName = (pid: string) => projects.find((p) => p.id === pid)?.name ?? '';
 
-  // monta todos os itens do calendário
+  // monta todos os itens do calendário, filtrando por membro selecionado
   const items: CalItem[] = [];
   tasks.forEach((t) => {
+    if (filterMember !== 'all' && !t.assignedTo.includes(filterMember)) return;
     const category: Category = t.period === 'semanal' ? 'entrega' : 'tarefa';
     items.push({ id: t.id, title: t.title, category, color: CATEGORY[category].color, date: t.dueDate, to: `/atividades/${t.id}`, task: t, projectId: t.projectId });
   });
   events.forEach((e) => {
+    if (filterMember !== 'all' && !e.members.includes(filterMember)) return;
     items.push({ id: e.id, title: e.title, category: e.category, color: CATEGORY[e.category].color, date: e.date, event: e });
   });
   projects.forEach((p) => {
@@ -197,6 +201,7 @@ export function Agenda() {
         members: it.task.assignedTo,
         priority: it.task.priority,
         projectId: it.task.projectId,
+        parentTaskId: it.task.parentTaskId ?? '',
         time: '',
         description: it.task.description ?? '',
         note: it.task.note ?? '',
@@ -270,6 +275,7 @@ export function Agenda() {
             description: form.description.trim(),
             note: form.note.trim(),
             projectId: form.projectId,
+            parentTaskId: form.parentTaskId || undefined,
             assignedTo: form.members.slice(0, 2),
             priority: form.priority,
             period: form.type === 'entrega' ? 'semanal' : 'diaria',
@@ -341,7 +347,7 @@ export function Agenda() {
       }
     >
       {/* Mês + legenda */}
-      <div className="flex items-center gap-4 mb-4 flex-wrap">
+      <div className="flex items-center gap-4 mb-3 flex-wrap">
         <h2 className="text-xl font-bold text-base-primary capitalize">{monthLabel}</h2>
         <div className="flex items-center gap-3 ml-auto text-xs font-mono text-base-muted flex-wrap">
           {(Object.keys(CATEGORY) as Category[]).map((c) => (
@@ -351,6 +357,27 @@ export function Agenda() {
             </span>
           ))}
         </div>
+      </div>
+
+      {/* Filtro por membro */}
+      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        <Users size={13} className="text-base-muted shrink-0" />
+        <button
+          onClick={() => setFilterMember('all')}
+          className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${filterMember === 'all' ? 'bg-viper-500 text-white' : 'text-base-muted hover:text-base-primary hover:bg-subtle'}`}
+        >
+          Todos
+        </button>
+        {users.map((u) => (
+          <button
+            key={u.id}
+            onClick={() => setFilterMember(u.id)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-colors ${filterMember === u.id ? 'bg-viper-500 text-white' : 'text-base-muted hover:text-base-primary hover:bg-subtle'}`}
+          >
+            <Avatar user={u} size={16} fontSize={7} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
+            {u.name.split(' ')[0]}
+          </button>
+        ))}
       </div>
 
       {/* Calendário */}
@@ -735,12 +762,23 @@ export function Agenda() {
                           </Select>
                         </FormField>
                         <FormField label="Cliente">
-                          <Select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}>
+                          <Select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value, parentTaskId: '' }))}>
                             <option value="">Nenhum</option>
                             {projects.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                           </Select>
                         </FormField>
                       </div>
+                      <FormField label="Projeto" hint="Opcional">
+                        <Select
+                          value={form.parentTaskId}
+                          onChange={(e) => setForm((f) => ({ ...f, parentTaskId: e.target.value }))}
+                        >
+                          <option value="">Sem projeto</option>
+                          {tasks
+                            .filter((t) => t.period === 'semanal' && (!form.projectId || t.projectId === form.projectId))
+                            .map((t) => (<option key={t.id} value={t.id}>{t.title}</option>))}
+                        </Select>
+                      </FormField>
                       <FormField label="Descrição">
                         <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} placeholder="Descreva o que precisa ser feito..." />
                       </FormField>

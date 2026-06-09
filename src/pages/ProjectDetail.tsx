@@ -692,8 +692,8 @@ export function ProjectDetail() {
                 {weeklyTasks.map((task, i) => {
                   const dailies = dailiesFor(task.id);
                   const dDone = dailies.filter((d) => d.status === 'concluida').length;
-                  const st = progressState(dDone, dailies.length);
                   const isDone = task.status === 'concluida';
+                  const st = progressState(dDone, dailies.length, isDone);
                   return (
                     <div key={task.id} className="px-5 py-3.5 border-b last:border-0" style={{ borderColor: 'var(--border)', backgroundColor: i % 2 === 0 ? 'var(--surface)' : 'var(--bg-subtle)' }}>
                       {/* Cabeçalho do projeto */}

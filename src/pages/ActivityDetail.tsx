@@ -75,7 +75,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 };
 
 interface EditTaskForm {
-  title: string; description: string; priority: TaskPriority; dueDate: string; assignedTo: string[];
+  title: string; description: string; priority: TaskPriority; dueDate: string; assignedTo: string[]; projectId: string; parentTaskId: string;
 }
 interface SubForm {
   title: string; description: string;
@@ -123,7 +123,7 @@ export function ActivityDetail() {
 
   // Edição da task/projeto.
   const [showEdit, setShowEdit] = useState(false);
-  const [editForm, setEditForm] = useState<EditTaskForm>({ title: '', description: '', priority: 'media', dueDate: '', assignedTo: [] });
+  const [editForm, setEditForm] = useState<EditTaskForm>({ title: '', description: '', priority: 'media', dueDate: '', assignedTo: [], projectId: '', parentTaskId: '' });
 
   // Popup de detalhe/edição de uma etapa.
   const [openSub, setOpenSub] = useState<Subtask | null>(null);
@@ -180,7 +180,7 @@ export function ActivityDetail() {
   const parentWeekly = task.parentTaskId ? allTasks.find((t) => t.id === task.parentTaskId) : undefined;
 
   // Progresso: no projeto vem das tasks; na task, das etapas.
-  const weeklyProg = progressState(childDone, children.length);
+  const weeklyProg = progressState(childDone, children.length, isDone);
   const dailyPct = totalSub ? Math.round((doneSubtasks / totalSub) * 100) : (isDone ? 100 : 0);
   const progressPct = isWeekly ? weeklyProg.pct : dailyPct;
   const progressEmpty = isWeekly && weeklyProg.empty;
@@ -207,6 +207,10 @@ export function ActivityDetail() {
     if (!canEdit) return;
     const completing = task.status !== 'concluida';
     await setTaskComplete(task.id, completing);
+    if (completing && isWeekly && children.length > 0) {
+      const pending = children.filter((c) => c.status !== 'concluida');
+      await Promise.all(pending.map((c) => setTaskComplete(c.id, true)));
+    }
     if (completing) toast.success('🏆 Task Concluída!');
     reload();
   };
@@ -279,6 +283,8 @@ export function ActivityDetail() {
       priority: task.priority,
       dueDate: task.dueDate,
       assignedTo: task.assignedTo,
+      projectId: task.projectId,
+      parentTaskId: task.parentTaskId ?? '',
     });
     setShowEdit(true);
   };
@@ -291,7 +297,8 @@ export function ActivityDetail() {
         title: editForm.title.trim(),
         description: editForm.description,
         note: task.note ?? '',
-        projectId: task.projectId,
+        projectId: editForm.projectId,
+        parentTaskId: editForm.parentTaskId || undefined,
         assignedTo: editForm.assignedTo,
         priority: editForm.priority,
         dueDate: editForm.dueDate,
@@ -908,6 +915,22 @@ export function ActivityDetail() {
           <FormField label="Descrição">
             <Textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Descreva o que precisa ser feito..." />
           </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Cliente">
+              <Select value={editForm.projectId} onChange={(e) => setEditForm((f) => ({ ...f, projectId: e.target.value, parentTaskId: '' }))}>
+                <option value="">Nenhum</option>
+                {projects.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+              </Select>
+            </FormField>
+            <FormField label="Projeto">
+              <Select value={editForm.parentTaskId} onChange={(e) => setEditForm((f) => ({ ...f, parentTaskId: e.target.value }))}>
+                <option value="">Sem projeto</option>
+                {allTasks
+                  .filter((t) => t.period === 'semanal' && (!editForm.projectId || t.projectId === editForm.projectId))
+                  .map((t) => (<option key={t.id} value={t.id}>{t.title}</option>))}
+              </Select>
+            </FormField>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Prioridade">
               <Select value={editForm.priority} onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value as TaskPriority }))}>

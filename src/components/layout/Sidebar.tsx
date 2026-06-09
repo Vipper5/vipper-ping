@@ -70,9 +70,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     navigate('/login');
   };
 
+  const isMatheus = user?.name?.toLowerCase().startsWith('matheus');
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.socioOnly && user?.role !== 'socio') return false;
     if (item.estagiarioOnly && user?.role !== 'estagiario') return false;
+    if (item.to === '/ponto' && isMatheus) return false;
     return true;
   });
 

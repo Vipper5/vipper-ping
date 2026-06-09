@@ -401,6 +401,7 @@ export interface TaskUpdate {
   description: string;
   note: string;
   projectId: string;
+  parentTaskId?: string;
   assignedTo: string[];
   priority: TaskPriority;
   dueDate: string;
@@ -415,6 +416,7 @@ export async function updateTask(id: string, input: TaskUpdate): Promise<void> {
       description: input.description || null,
       note: input.note || null,
       project_id: input.projectId || null,
+      parent_task_id: input.parentTaskId || null,
       priority: input.priority,
       due_date: input.dueDate || null,
     })

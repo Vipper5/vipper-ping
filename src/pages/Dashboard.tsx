@@ -309,9 +309,9 @@ export function Dashboard() {
 
   const otherMembers = isSocio ? users.filter((u) => u.id !== user.id) : [];
 
-  // Itens do calendário — espelha a Agenda (todas as tasks + eventos + conclusões de projeto).
+  // Itens do calendário — apenas as tasks do usuário logado.
   const calItems: CalItem[] = [];
-  allTasks.forEach((t) => {
+  myTasks.forEach((t) => {
     const category: Category = t.period === 'semanal' ? 'entrega' : 'tarefa';
     calItems.push({ id: t.id, title: t.title, category, color: CATEGORY[category].color, date: t.dueDate, to: `/atividades/${t.id}` });
   });
