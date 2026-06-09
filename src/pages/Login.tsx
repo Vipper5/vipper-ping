@@ -53,7 +53,7 @@ export function Login() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
             <img
-              src={dark ? '/logo2-white.png' : '/logo2-abismo.png'}
+              src={dark ? '/logo2-color.png' : '/logo2-abismo.png'}
               alt="Vipper"
               className="h-11 w-11 object-contain shrink-0"
             />

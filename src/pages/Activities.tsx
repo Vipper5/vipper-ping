@@ -41,7 +41,7 @@ function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
-const STATUS_RANK: Record<string, number> = { em_andamento: 0, pendente: 1, concluida: 2 };
+const STATUS_RANK: Record<string, number> = { concluida: 0, em_andamento: 1, pendente: 2 };
 
 // Período da task (legado sem período conta como Task).
 function taskPeriod(t: Task): TaskPeriod {
@@ -204,7 +204,7 @@ export function Activities() {
   const { data: tasks, loading, error, reload } = useTasks();
   const { data: projects } = useProjects();
   const { data: users } = useUsers();
-  const [period, setPeriod] = useState<TaskPeriod>('diaria');
+  const [period, setPeriod] = useState<TaskPeriod>('semanal');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterAssignee, setFilterAssignee] = useState<string>('mine');
   const [hoveredFilter, setHoveredFilter] = useState<string | null>(null);
@@ -299,18 +299,20 @@ export function Activities() {
     .filter((t) => filterStatus === 'all' || t.status === filterStatus)
     .filter((t) => !hideCompleted || t.status !== 'concluida')
     .sort((a, b) => {
-      const r = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
-      if (r !== 0) return r;
-      return a.dueDate.localeCompare(b.dueDate);
+      const statusDiff = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
+      if (statusDiff !== 0) return statusDiff;
+      const projA = projects.find((p) => p.id === a.projectId)?.name ?? '';
+      const projB = projects.find((p) => p.id === b.projectId)?.name ?? '';
+      const projDiff = projA.localeCompare(projB, 'pt-BR', { sensitivity: 'base' });
+      if (projDiff !== 0) return projDiff;
+      return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
     });
 
-  // Filtros de status com cor + brilho neon.
-  // Ordem: Todas → Pendente → Em andamento → Concluída.
   const statusFilters: { key: string; label: string }[] = [
     { key: 'all', label: 'Todas' },
-    { key: 'pendente', label: 'Pendente' },
-    { key: 'em_andamento', label: 'Em andamento' },
     { key: 'concluida', label: 'Concluída' },
+    { key: 'em_andamento', label: 'Em andamento' },
+    { key: 'pendente', label: 'Pendente' },
   ];
   const filterColors: Record<string, { base: string; light: string; glow: string; darkText: string }> = {
     all:         { base: '#6D28D9', light: '#7C3AED', glow: '109,40,217',  darkText: '#5B21B6' },

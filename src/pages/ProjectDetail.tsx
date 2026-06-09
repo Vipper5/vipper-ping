@@ -688,14 +688,14 @@ export function ProjectDetail() {
                 Nenhum projeto. {isSocio && 'Crie projetos e vá realizando tasks até concluí-los.'}
               </div>
             ) : (
-              <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                {weeklyTasks.map((task) => {
+              <div>
+                {weeklyTasks.map((task, i) => {
                   const dailies = dailiesFor(task.id);
                   const dDone = dailies.filter((d) => d.status === 'concluida').length;
                   const st = progressState(dDone, dailies.length);
                   const isDone = task.status === 'concluida';
                   return (
-                    <div key={task.id} className="px-5 py-3.5">
+                    <div key={task.id} className="px-5 py-3.5 border-b last:border-0" style={{ borderColor: 'var(--border)', backgroundColor: i % 2 === 0 ? 'var(--surface)' : 'var(--bg-subtle)' }}>
                       {/* Cabeçalho do projeto */}
                       <div className="flex items-center gap-3">
                         {isDone

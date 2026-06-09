@@ -85,7 +85,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     >
       {/* Logo — height matches the page header so the bottom borders align */}
       <div className="h-[73px] flex items-center gap-3 px-5 border-b shrink-0" style={{ borderColor: 'var(--sidebar-border)' }}>
-        <img src="/logo2-white.png" alt="Vipper" className="h-9 w-9 object-contain shrink-0" />
+        <img src="/logo2-color.png" alt="Vipper" className="h-9 w-9 object-contain shrink-0" />
         <div>
           <div className="text-white font-bold text-sm leading-tight">Vipper</div>
           <div className="text-viper-300 text-xs font-mono tracking-widest uppercase">Ping</div>

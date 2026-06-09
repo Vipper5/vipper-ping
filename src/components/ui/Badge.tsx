@@ -54,6 +54,8 @@ export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { variant: BadgeVariant; label: string }> = {
     Ativo: { variant: 'success', label: 'Ativo' },
     Pausado: { variant: 'warning', label: 'Pausado' },
+    'Em Desenvolvimento': { variant: 'info', label: 'Em Desenvolvimento' },
+    Pendente: { variant: 'error', label: 'Pendente' },
     'Concluído': { variant: 'info', label: 'Concluído' },
     pendente: { variant: 'neutral', label: 'Pendente' },
     em_andamento: { variant: 'info', label: 'Em andamento' },

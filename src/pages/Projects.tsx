@@ -42,8 +42,16 @@ const STATUS_ACCENT: Record<ProjectStatus, string> = {
   Ativo: '#047857',
   'Em Desenvolvimento': '#1D4ED8',
   Pausado: '#475569',
+  Pendente: '#B91C1C',
   'Concluído': '#0F766E',
 };
+
+// Cor da barra de progresso por percentual: <35% vermelho, 35–74% roxo, ≥75% verde.
+function progressBarColor(pct: number): string {
+  if (pct >= 75) return '#047857';
+  if (pct >= 35) return '#8637CC';
+  return '#B91C1C';
+}
 
 // Metadados do prazo: cor + rótulo (relativo quando urgente, data caso contrário).
 function deadlineMeta(endDate: string, status: ProjectStatus): { color: string; label: string; urgent: boolean } {
@@ -172,8 +180,8 @@ export function Projects() {
       setShowModal(false);
       reload();
       toast.success('Operação concluída.');
-    } catch {
-      toast.error('Não foi possível salvar.');
+    } catch (e) {
+      toast.error(`Não foi possível salvar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSaving(false);
     }
@@ -199,17 +207,33 @@ export function Projects() {
     Ativo: projects.filter((p) => p.status === 'Ativo').length,
     'Em Desenvolvimento': projects.filter((p) => p.status === 'Em Desenvolvimento').length,
     Pausado: projects.filter((p) => p.status === 'Pausado').length,
-    'Concluído': projects.filter((p) => p.status === 'Concluído').length,
+    Pendente: projects.filter((p) => p.status === 'Pendente').length,
   };
 
-  const filtered = statusFilter === 'all' ? projects : projects.filter((p) => p.status === statusFilter);
+  const STATUS_ORDER: Record<string, number> = {
+    Ativo: 0,
+    'Em Desenvolvimento': 1,
+    Pausado: 2,
+    Pendente: 3,
+    'Concluído': 4,
+  };
+
+  const sortProjects = (list: Project[]) =>
+    [...list].sort((a, b) => {
+      const diff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+      return diff !== 0 ? diff : a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+
+  const filtered = sortProjects(
+    statusFilter === 'all' ? projects : projects.filter((p) => p.status === statusFilter),
+  );
 
   const filters: { key: string; label: string }[] = [
     { key: 'all', label: 'Todos' },
     { key: 'Ativo', label: 'Ativos' },
     { key: 'Em Desenvolvimento', label: 'Em Desenvolvimento' },
     { key: 'Pausado', label: 'Pausados' },
-    { key: 'Concluído', label: 'Concluídos' },
+    { key: 'Pendente', label: 'Pendentes' },
   ];
 
   // Cor de cada filtro. `darkText` = texto escuro em light mode (garante contraste no fundo claro).
@@ -218,7 +242,7 @@ export function Projects() {
     Ativo:                { base: '#047857', light: '#059669', glow: '4,120,87',    darkText: '#065F46' },
     'Em Desenvolvimento': { base: '#1D4ED8', light: '#2563EB', glow: '29,78,216',  darkText: '#1E40AF' },
     Pausado:              { base: '#475569', light: '#64748B', glow: '71,85,105',   darkText: '#334155' },
-    'Concluído':          { base: '#0F766E', light: '#0D9488', glow: '15,118,110', darkText: '#115E59' },
+    Pendente:             { base: '#B91C1C', light: '#DC2626', glow: '185,28,28',   darkText: '#991B1B' },
   };
 
   return (
@@ -301,10 +325,10 @@ export function Projects() {
               <Link
                 key={project.id}
                 to={`/projetos/${project.id}`}
-                className="group relative card-interactive rounded-xl overflow-hidden p-5 pl-6 flex flex-col"
+                className="group relative card-interactive rounded-lg overflow-hidden p-4 pl-5 flex flex-col"
               >
                 {/* Acento lateral por status */}
-                <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: accent }} />
+                <span className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: accent }} />
 
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
@@ -349,17 +373,17 @@ export function Projects() {
                 )}
 
                 {/* Progresso (empurrado para a base p/ alinhar os cards) */}
-                <div className="mt-auto pt-5">
+                <div className="mt-auto pt-4">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="inline-flex items-center gap-1.5 text-xs text-base-muted">
                       <ListChecks size={13} /> {st.done}/{st.total} tarefas
                     </span>
-                    <span className="text-sm font-num font-bold" style={{ color: accent }}>{st.pct}%</span>
+                    <span className="text-sm font-num font-bold" style={{ color: progressBarColor(st.pct) }}>{st.pct}%</span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--track)' }}>
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${st.pct}%`, backgroundColor: accent, transition: 'width 0.6s ease' }}
+                      style={{ width: `${st.pct}%`, backgroundColor: progressBarColor(st.pct), transition: 'width 0.6s ease' }}
                     />
                   </div>
                   {objTotal > 0 && (
@@ -437,7 +461,7 @@ export function Projects() {
                 <option>Ativo</option>
                 <option>Em Desenvolvimento</option>
                 <option>Pausado</option>
-                <option>Concluído</option>
+                <option>Pendente</option>
               </Select>
             </FormField>
             <FormField label="Início">

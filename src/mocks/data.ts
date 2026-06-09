@@ -17,7 +17,7 @@ export interface User {
   photo?: string;
 }
 
-export type ProjectStatus = 'Ativo' | 'Pausado' | 'Concluído' | 'Em Desenvolvimento';
+export type ProjectStatus = 'Ativo' | 'Pausado' | 'Concluído' | 'Em Desenvolvimento' | 'Pendente';
 
 // Objetivo do cliente — item de um checklist reordenável.
 export interface ProjectObjective {

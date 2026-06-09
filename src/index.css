@@ -12,6 +12,8 @@
     --surface2: #F1ECE0;
     --border: #DED7C6;
     --border-subtle: #E8E2D4;
+    /* Trilho de progressbar — mais escuro que o surface p/ a parte vazia aparecer */
+    --track: #D2C6AC;
     --text-primary: #221f1a;
     --text-secondary: #4a463d;
     --text-muted: #6e695a;
@@ -36,6 +38,8 @@
     --surface2: #2C2D34;
     --border: #2F3037;
     --border-subtle: #212228;
+    /* Trilho de progressbar — mais escuro que o surface p/ a parte vazia aparecer */
+    --track: #0E0F12;
     /* Texto mais vibrante no dark para facilitar a leitura (apenas cor) */
     --text-primary: #f6f6f9;
     --text-secondary: #c9c9d3;

@@ -325,9 +325,13 @@ export function MemberDetail() {
                 Nenhuma task atribuída.
               </div>
             ) : (
-              <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                {memberTasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-4 px-5 py-3.5">
+              <div>
+                {memberTasks.map((task, i) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-4 px-5 py-3.5 border-b last:border-0"
+                    style={{ borderColor: 'var(--border)', backgroundColor: i % 2 === 0 ? 'var(--surface)' : 'var(--bg-subtle)' }}
+                  >
                     {canEdit ? (
                       <button
                         onClick={() => toggleTaskStatus(task.id)}

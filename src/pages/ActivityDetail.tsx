@@ -38,8 +38,8 @@ import { progressColor, progressState } from '../lib/progress';
 import {
   setTaskComplete,
   setTaskStatus,
-  setTaskNote,
   updateTask,
+  createTask,
   toggleSubtask as apiToggleSubtask,
   addSubtask as apiAddSubtask,
   updateSubtask as apiUpdateSubtask,
@@ -130,10 +130,11 @@ export function ActivityDetail() {
   const [subEditing, setSubEditing] = useState(false);
   const [subEditForm, setSubEditForm] = useState<SubForm>({ title: '', description: '' });
 
-  // Anotação inline.
-  const [editingNote, setEditingNote] = useState(false);
-  const [noteText, setNoteText] = useState('');
-  const [savingNote, setSavingNote] = useState(false);
+  // Modal: criar nova task no projeto.
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [createTaskForm, setCreateTaskForm] = useState<{ title: string; description: string; priority: TaskPriority; dueDate: string; assignedTo: string[] }>({
+    title: '', description: '', priority: 'media', dueDate: '', assignedTo: [],
+  });
 
   // Notas do projeto (modal).
   const [showNoteModal, setShowNoteModal] = useState(false);
@@ -314,22 +315,29 @@ export function ActivityDetail() {
     }
   };
 
-  const startEditNote = () => {
-    setNoteText(task.note ?? '');
-    setEditingNote(true);
-  };
-  const cancelEditNote = () => setEditingNote(false);
-  const saveNote = async () => {
-    if (savingNote) return;
-    setSavingNote(true);
+  const handleCreateTask = async () => {
+    if (!createTaskForm.title.trim() || !user || saving) return;
+    setSaving(true);
     try {
-      await setTaskNote(task.id, noteText.trim() || null);
-      setEditingNote(false);
+      await createTask({
+        title: createTaskForm.title.trim(),
+        description: createTaskForm.description,
+        projectId: task.projectId,
+        assignedTo: createTaskForm.assignedTo,
+        priority: createTaskForm.priority,
+        period: 'diaria',
+        dueDate: createTaskForm.dueDate,
+        createdBy: user.id,
+        parentTaskId: isWeekly ? task.id : task.parentTaskId,
+      });
+      setShowCreateTask(false);
+      setCreateTaskForm({ title: '', description: '', priority: 'media', dueDate: '', assignedTo: [] });
       reload();
-    } catch {
-      toast.error('Não foi possível salvar a anotação.');
+      toast.success('Task criada.');
+    } catch (e) {
+      toast.error(`Não foi possível criar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setSavingNote(false);
+      setSaving(false);
     }
   };
 
@@ -436,11 +444,11 @@ export function ActivityDetail() {
               </button>
             ) : (
               <button
-                onClick={startProgress}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(29,78,216,0.55)]"
-                style={{ backgroundColor: '#1D4ED8' }}
+                onClick={() => setShowCreateTask(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(109,40,217,0.55)]"
+                style={{ backgroundColor: '#6D28D9' }}
               >
-                <Circle size={14} /> <span className="hidden sm:inline">Em andamento</span>
+                <Plus size={14} /> <span className="hidden sm:inline">Criar Task</span>
               </button>
             )
           )}
@@ -463,16 +471,15 @@ export function ActivityDetail() {
         </div>
       }
     >
-      {/* Layout de "ticket": banner com acento de status (distinto do dashboard de cliente) */}
       <div className="max-w-3xl mx-auto space-y-5">
-        {/* HERO — faixa de status com meta e progresso */}
+        {/* HERO — gradiente para projetos semanais; ticket limpo para tasks diárias */}
         <div
           className="relative rounded-xl overflow-hidden"
           style={{
             border: '1px solid var(--border)',
             boxShadow: 'var(--card-shadow)',
             backgroundColor: 'var(--surface)',
-            backgroundImage: `linear-gradient(120deg, ${statusColor}1f, transparent 62%)`,
+            backgroundImage: isWeekly ? `linear-gradient(120deg, ${statusColor}1f, transparent 62%)` : 'none',
           }}
         >
           <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: statusColor }} />
@@ -568,11 +575,6 @@ export function ActivityDetail() {
           <div className="card rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
               <SectionTitle icon={<Target size={13} />} label="Tasks" count={children.length > 0 ? `${childDone}/${children.length}` : undefined} />
-              {project && (
-                <Link to={`/projetos/${project.id}`} className="text-xs text-viper-500 hover:text-viper-400 font-mono transition-colors">
-                  gerir no cliente →
-                </Link>
-              )}
             </div>
             {children.length === 0 ? (
               <p className="text-xs text-base-muted">Nenhuma task ligada. Crie a partir do cliente.</p>
@@ -642,58 +644,9 @@ export function ActivityDetail() {
           </div>
         )}
 
-        {/* ANOTAÇÃO */}
-        <div className="card rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <SectionTitle icon={<StickyNote size={13} />} label="Anotação" />
-            {!editingNote && canEdit && (
-              <button
-                onClick={startEditNote}
-                className="p-1 rounded text-base-muted hover:text-viper-500 transition-colors"
-                title="Editar anotação"
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-          </div>
-
-          {editingNote ? (
-            <div className="space-y-2">
-              <textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                rows={4}
-                placeholder="Adicione uma anotação sobre esta task..."
-                className="w-full px-3 py-2 rounded-md border text-sm resize-none focus:outline-none focus:border-viper-500 transition-colors"
-                style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                autoFocus
-              />
-              <div className="flex justify-end gap-2">
-                <button onClick={cancelEditNote} className="px-3 py-1.5 text-xs rounded-md text-base-muted hover:text-base-primary transition-colors">Cancelar</button>
-                <button
-                  onClick={saveNote}
-                  disabled={savingNote}
-                  className="px-3 py-1.5 text-xs rounded-md text-white font-medium transition-colors"
-                  style={{ backgroundColor: '#047857' }}
-                >
-                  {savingNote ? 'Salvando…' : 'Salvar'}
-                </button>
-              </div>
-            </div>
-          ) : task.note ? (
-            <p className="text-sm text-base-secondary leading-relaxed whitespace-pre-wrap">{task.note}</p>
-          ) : (
-            <p className="text-xs text-base-muted">
-              Sem anotação.{canEdit && (
-                <button onClick={startEditNote} className="ml-1 text-viper-500 hover:text-viper-400 transition-colors">Adicionar.</button>
-              )}
-            </p>
-          )}
-        </div>
-
-        {/* DOCUMENTAÇÃO + NOTAS do cliente — apenas para tasks de projeto */}
+        {/* DOCUMENTAÇÃO + NOTAS em 2 colunas — apenas para projetos semanais */}
         {isWeekly && project && (
-          <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* Documentação */}
             <div className="card rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
@@ -734,7 +687,7 @@ export function ActivityDetail() {
             {/* Notas */}
             <div className="card rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
-                <SectionTitle icon={<StickyNote size={13} />} label="Notas do projeto" />
+                <SectionTitle icon={<StickyNote size={13} />} label="Notas" />
                 <Button variant="tertiary" size="sm" onClick={() => setShowNoteModal(true)}>
                   <Plus size={13} /> Nota
                 </Button>
@@ -770,9 +723,70 @@ export function ActivityDetail() {
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
+
+      {/* Criar Task */}
+      <Modal
+        open={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        title="Nova Task"
+        description={project ? `Projeto: ${task.title}` : undefined}
+        size="md"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setShowCreateTask(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleCreateTask} disabled={!createTaskForm.title.trim() || saving}>
+              {saving ? 'Criando…' : 'Criar task'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Título" required>
+            <Input
+              autoFocus
+              value={createTaskForm.title}
+              onChange={(e) => setCreateTaskForm((f) => ({ ...f, title: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTask(); } }}
+              placeholder="Ex.: Implementar tela de login"
+            />
+          </FormField>
+          <FormField label="Descrição">
+            <Textarea
+              value={createTaskForm.description}
+              onChange={(e) => setCreateTaskForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+              placeholder="Descreva o que precisa ser feito..."
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Prioridade">
+              <Select value={createTaskForm.priority} onChange={(e) => setCreateTaskForm((f) => ({ ...f, priority: e.target.value as TaskPriority }))}>
+                <option value="baixa">Baixa</option>
+                <option value="media">Média</option>
+                <option value="alta">Alta</option>
+              </Select>
+            </FormField>
+            <FormField label="Prazo">
+              <Input type="date" value={createTaskForm.dueDate} onChange={(e) => setCreateTaskForm((f) => ({ ...f, dueDate: e.target.value }))} />
+            </FormField>
+          </div>
+          <FormField label="Responsáveis" hint="Selecione até 2">
+            <AssigneePicker
+              users={users}
+              value={createTaskForm.assignedTo}
+              onToggle={(uid) => setCreateTaskForm((f) => ({
+                ...f,
+                assignedTo: f.assignedTo.includes(uid)
+                  ? f.assignedTo.filter((x) => x !== uid)
+                  : f.assignedTo.length < 2 ? [...f.assignedTo, uid] : f.assignedTo,
+              }))}
+            />
+          </FormField>
+        </div>
+      </Modal>
 
       {/* Popup de detalhe/edição de etapa */}
       <Modal

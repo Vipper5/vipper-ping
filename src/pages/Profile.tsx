@@ -220,8 +220,8 @@ export function Profile() {
           {myTasks.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-base-muted">Nenhuma task atribuída a você.</p>
           ) : (
-            <div className="divide-y max-h-[22rem] overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
-              {sortedTasks.map((t) => {
+            <div className="max-h-[22rem] overflow-y-auto">
+              {sortedTasks.map((t, i) => {
                 const isDone = t.status === 'concluida';
                 const PeriodIcon = taskPeriod(t) === 'semanal' ? CalendarRange : Sun;
                 const periodColor = taskPeriod(t) === 'semanal' ? '#8637CC' : '#F5AE39';
@@ -229,7 +229,8 @@ export function Profile() {
                   <Link
                     key={t.id}
                     to={`/atividades/${t.id}`}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-subtle transition-colors"
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-subtle transition-colors border-b last:border-0"
+                    style={{ borderColor: 'var(--border)', backgroundColor: i % 2 === 0 ? 'var(--surface)' : 'var(--bg-subtle)' }}
                   >
                     <PeriodIcon size={15} className="shrink-0" style={{ color: periodColor }} />
                     <div className="flex-1 min-w-0">
