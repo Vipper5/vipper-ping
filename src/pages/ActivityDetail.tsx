@@ -234,6 +234,8 @@ export function ActivityDetail() {
       setSubForm({ title: '', description: '' });
       setShowSubModal(false);
       reload();
+    } catch (e) {
+      toast.error(`Não foi possível adicionar a etapa: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSaving(false);
     }
@@ -863,8 +865,8 @@ export function ActivityDetail() {
         size="sm"
         footer={
           <>
-            <Button variant="tertiary" onClick={() => setShowSubModal(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={addSubtask} disabled={!subForm.title.trim() || saving}>Adicionar</Button>
+            <Button type="button" variant="tertiary" onClick={() => setShowSubModal(false)}>Cancelar</Button>
+            <Button type="button" variant="primary" onClick={addSubtask} disabled={!subForm.title.trim() || saving}>Adicionar</Button>
           </>
         }
       >
