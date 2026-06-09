@@ -423,6 +423,17 @@ export function ActivityDetail() {
       back={{ to: '/atividades', label: 'Tasks' }}
       action={
         <div className="flex items-center gap-2">
+          {/* Criar Task — apenas em projetos (semanais) */}
+          {isWeekly && isSocio && (
+            <button
+              onClick={() => setShowCreateTask(true)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(109,40,217,0.55)]"
+              style={{ backgroundColor: '#6D28D9' }}
+            >
+              <Plus size={14} /> <span className="hidden sm:inline">Criar Task</span>
+            </button>
+          )}
+          {/* Concluir / Reverter — para todos os tipos */}
           {canEdit && (
             isDone ? (
               <button
@@ -434,21 +445,13 @@ export function ActivityDetail() {
               >
                 <RotateCcw size={14} /> <span className="hidden sm:inline">Reverter</span>
               </button>
-            ) : task.status === 'em_andamento' ? (
+            ) : (
               <button
                 onClick={toggleComplete}
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(4,120,87,0.55)]"
                 style={{ backgroundColor: '#047857' }}
               >
                 <CheckCircle2 size={14} /> <span className="hidden sm:inline">Concluir</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowCreateTask(true)}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(109,40,217,0.55)]"
-                style={{ backgroundColor: '#6D28D9' }}
-              >
-                <Plus size={14} /> <span className="hidden sm:inline">Criar Task</span>
               </button>
             )
           )}
