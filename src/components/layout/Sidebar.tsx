@@ -27,7 +27,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { to: '/projetos', label: 'Projetos', icon: <FolderKanban size={18} /> },
+  { to: '/projetos', label: 'Clientes', icon: <FolderKanban size={18} /> },
   { to: '/atividades', label: 'Tasks', icon: <CheckSquare size={18} /> },
   { to: '/finalizadas', label: 'Finalizadas', icon: <CheckCheck size={18} /> },
   { to: '/agenda', label: 'Agenda', icon: <CalendarDays size={18} /> },

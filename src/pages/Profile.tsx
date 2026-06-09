@@ -237,7 +237,7 @@ export function Profile() {
                         {t.title}
                       </p>
                       <p className="text-xs text-base-muted font-mono truncate">
-                        {projects.find((p) => p.id === t.projectId)?.name ?? 'Sem projeto'}
+                        {projects.find((p) => p.id === t.projectId)?.name ?? 'Sem cliente'}
                       </p>
                     </div>
                     <StatusBadge status={t.status} />

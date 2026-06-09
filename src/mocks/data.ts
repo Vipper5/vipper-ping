@@ -17,9 +17,9 @@ export interface User {
   photo?: string;
 }
 
-export type ProjectStatus = 'Ativo' | 'Pausado' | 'Concluído';
+export type ProjectStatus = 'Ativo' | 'Pausado' | 'Concluído' | 'Em Desenvolvimento';
 
-// Objetivo do projeto — item de um checklist reordenável.
+// Objetivo do cliente — item de um checklist reordenável.
 export interface ProjectObjective {
   id: string;
   title: string;
@@ -39,8 +39,8 @@ export interface Project {
   responsibles: string[];
   description: string;
   docs: { title: string; url: string; addedAt: string }[];
-  notes: { id: string; text: string; author: string; createdAt: string }[];
-  // Objetivos do projeto — checklist de metas (ver project_objectives).
+  notes: { id: string; text: string; author: string; createdAt: string; imageUrl?: string }[];
+  // Objetivos do cliente — checklist de metas (ver project_objectives).
   objectives: ProjectObjective[];
 }
 

@@ -50,7 +50,7 @@ function formatDateTime(d: string) {
   });
 }
 
-// Cor de acento por status — dá identidade visual à página de task (diferente do projeto).
+// Cor de acento por status — dá identidade visual à página de task (diferente do cliente).
 const STATUS_COLOR: Record<string, string> = {
   pendente: '#94908a',
   em_andamento: '#5294E6',
@@ -109,11 +109,11 @@ export function ActivityDetail() {
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Edição da task diária/semanal.
+  // Edição da task/projeto.
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditTaskForm>({ title: '', description: '', priority: 'media', dueDate: '', assignedTo: [] });
 
-  // Popup de detalhe/edição de uma subtarefa.
+  // Popup de detalhe/edição de uma etapa.
   const [openSub, setOpenSub] = useState<Subtask | null>(null);
   const [subEditing, setSubEditing] = useState(false);
   const [subEditForm, setSubEditForm] = useState<SubForm>({ title: '', description: '' });
@@ -142,25 +142,25 @@ export function ActivityDetail() {
   const isDone = task.status === 'concluida';
   const totalSub = task.subtasks.length;
 
-  // Hierarquia: semanal → diárias (filhas) → subtarefas.
+  // Hierarquia: projeto → tasks (filhas) → etapas.
   const isWeekly = task.period === 'semanal';
   const children = allTasks.filter((t) => t.parentTaskId === task.id);
   const childDone = children.filter((c) => c.status === 'concluida').length;
   const parentWeekly = task.parentTaskId ? allTasks.find((t) => t.id === task.parentTaskId) : undefined;
 
-  // Progresso: na semanal vem das diárias; na diária, das subtarefas.
+  // Progresso: no projeto vem das tasks; na task, das etapas.
   const weeklyProg = progressState(childDone, children.length);
   const dailyPct = totalSub ? Math.round((doneSubtasks / totalSub) * 100) : (isDone ? 100 : 0);
   const progressPct = isWeekly ? weeklyProg.pct : dailyPct;
   const progressEmpty = isWeekly && weeklyProg.empty;
   const progressBarColor = isWeekly ? weeklyProg.color : progressColor(dailyPct);
   const progressCaption = isWeekly
-    ? (weeklyProg.empty ? 'Aguarde por novas atividades' : `${childDone}/${children.length} diárias concluídas`)
+    ? (weeklyProg.empty ? 'Aguarde por novas atividades' : `${childDone}/${children.length} tasks concluídas`)
     : (totalSub
-        ? `${doneSubtasks}/${totalSub} subtarefas concluídas`
+        ? `${doneSubtasks}/${totalSub} etapas concluídas`
         : isDone
         ? 'Task concluída'
-        : 'Sem subtarefas — conclua a task para chegar a 100%');
+        : 'Sem etapas — conclua a task para chegar a 100%');
 
   const isSocio = user?.role === 'socio';
   const isOwner = task.assignedTo.includes(user?.id ?? '');
@@ -212,7 +212,7 @@ export function ActivityDetail() {
     reload();
   };
 
-  // Abre o popup de uma subtarefa (modo leitura).
+  // Abre o popup de uma etapa (modo leitura).
   const openSubtask = (sub: Subtask) => {
     setOpenSub(sub);
     setSubEditing(false);
@@ -229,9 +229,9 @@ export function ActivityDetail() {
       });
       setOpenSub(null);
       reload();
-      toast.success('Subtarefa atualizada.');
+      toast.success('Etapa atualizada.');
     } catch {
-      toast.error('Não foi possível salvar a subtarefa.');
+      toast.error('Não foi possível salvar a etapa.');
     } finally {
       setSaving(false);
     }
@@ -347,7 +347,7 @@ export function ActivityDetail() {
         </div>
       }
     >
-      {/* Layout de "ticket": banner com acento de status (distinto do dashboard de projeto) */}
+      {/* Layout de "ticket": banner com acento de status (distinto do dashboard de cliente) */}
       <div className="max-w-3xl mx-auto space-y-5">
         {/* HERO — faixa de status com meta e progresso */}
         <div
@@ -368,7 +368,7 @@ export function ActivityDetail() {
                 style={{ backgroundColor: `${periodColor}1f`, color: periodColor }}
               >
                 <PeriodIcon size={13} />
-                {isWeekly ? 'Semanal' : 'Diária'}
+                {isWeekly ? 'Projeto' : 'Task'}
               </span>
               <StatusBadge status={task.status} />
               <span
@@ -383,7 +383,7 @@ export function ActivityDetail() {
               {task.title}
             </h2>
 
-            {/* meta: prazo · projeto · semanal-pai · responsáveis */}
+            {/* meta: prazo · cliente · projeto-pai · responsáveis */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm">
               <span className="inline-flex items-center gap-1.5 text-base-secondary font-mono">
                 <CalendarClock size={14} className="text-base-muted" />
@@ -395,7 +395,7 @@ export function ActivityDetail() {
                 </Link>
               ) : (
                 <span className="inline-flex items-center gap-1.5 text-base-muted font-mono">
-                  <FolderKanban size={14} /> Task única
+                  <FolderKanban size={14} /> Sem cliente
                 </span>
               )}
               {parentWeekly && (
@@ -448,18 +448,18 @@ export function ActivityDetail() {
         </div>
 
         {isWeekly ? (
-          /* Semanal: lista as diárias ligadas (geridas no projeto) */
+          /* Projeto: lista as tasks ligadas (geridas no cliente) */
           <div className="card rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <SectionTitle icon={<Target size={13} />} label="Tasks diárias" count={children.length > 0 ? `${childDone}/${children.length}` : undefined} />
+              <SectionTitle icon={<Target size={13} />} label="Tasks" count={children.length > 0 ? `${childDone}/${children.length}` : undefined} />
               {project && (
                 <Link to={`/projetos/${project.id}`} className="text-xs text-viper-500 hover:text-viper-400 font-mono transition-colors">
-                  gerir no projeto →
+                  gerir no cliente →
                 </Link>
               )}
             </div>
             {children.length === 0 ? (
-              <p className="text-xs text-base-muted">Nenhuma task diária ligada. Crie a partir do projeto.</p>
+              <p className="text-xs text-base-muted">Nenhuma task ligada. Crie a partir do cliente.</p>
             ) : (
               <div className="space-y-1">
                 {children.map((c) => (
@@ -473,13 +473,13 @@ export function ActivityDetail() {
             )}
           </div>
         ) : (
-          /* Diária: subtarefas clicáveis (popup de detalhe/edição) */
+          /* Task: etapas clicáveis (popup de detalhe/edição) */
           <div className="card rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <SectionTitle icon={<CheckCircle2 size={13} />} label="Subtarefas" count={totalSub > 0 ? `${doneSubtasks}/${totalSub}` : undefined} />
+              <SectionTitle icon={<CheckCircle2 size={13} />} label="Etapas" count={totalSub > 0 ? `${doneSubtasks}/${totalSub}` : undefined} />
               {isSocio && (
                 <Button variant="tertiary" size="sm" onClick={() => { setSubForm({ title: '', description: '' }); setShowSubModal(true); }}>
-                  <Plus size={13} /> Nova subtarefa
+                  <Plus size={13} /> Nova etapa
                 </Button>
               )}
             </div>
@@ -511,7 +511,7 @@ export function ActivityDetail() {
                   {isSocio && (
                     <button
                       onClick={() => deleteSubtask(sub.id)}
-                      title="Excluir subtarefa"
+                      title="Excluir etapa"
                       className="shrink-0 opacity-0 group-hover/sub:opacity-100 p-0.5 rounded text-neutral-400 hover:text-danger transition-all"
                     >
                       <X size={14} />
@@ -520,18 +520,18 @@ export function ActivityDetail() {
                 </div>
               ))}
               {totalSub === 0 && (
-                <p className="text-xs text-base-muted py-1">Nenhuma subtarefa.{isSocio && ' Adicione com “Nova subtarefa”.'}</p>
+                <p className="text-xs text-base-muted py-1">Nenhuma etapa.{isSocio && ' Adicione com “Nova etapa”.'}</p>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Popup de detalhe/edição de subtarefa */}
+      {/* Popup de detalhe/edição de etapa */}
       <Modal
         open={!!openSub}
         onClose={() => setOpenSub(null)}
-        title="Subtarefa"
+        title="Etapa"
         size="sm"
         footer={
           subEditing ? (
@@ -559,7 +559,7 @@ export function ActivityDetail() {
               <Input value={subEditForm.title} onChange={(e) => setSubEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus />
             </FormField>
             <FormField label="Descrição">
-              <Textarea value={subEditForm.description} onChange={(e) => setSubEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} placeholder="Detalhe a subtarefa..." />
+              <Textarea value={subEditForm.description} onChange={(e) => setSubEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} placeholder="Detalhe a etapa..." />
             </FormField>
           </div>
         ) : (
@@ -590,11 +590,11 @@ export function ActivityDetail() {
         ))}
       </Modal>
 
-      {/* Nova subtarefa */}
+      {/* Nova etapa */}
       <Modal
         open={showSubModal}
         onClose={() => setShowSubModal(false)}
-        title="Nova subtarefa"
+        title="Nova etapa"
         description={`Para: ${task.title}`}
         size="sm"
         footer={
@@ -605,7 +605,7 @@ export function ActivityDetail() {
         }
       >
         <div className="space-y-4">
-          <FormField label="Título da subtarefa" required>
+          <FormField label="Título da etapa" required>
             <Input
               autoFocus
               value={subForm.title}
@@ -615,7 +615,7 @@ export function ActivityDetail() {
             />
           </FormField>
           <FormField label="Descrição">
-            <Textarea value={subForm.description} onChange={(e) => setSubForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalhes da subtarefa (opcional)..." />
+            <Textarea value={subForm.description} onChange={(e) => setSubForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalhes da etapa (opcional)..." />
           </FormField>
         </div>
       </Modal>
@@ -687,7 +687,7 @@ export function ActivityDetail() {
       >
         <p className="text-sm text-base-secondary">
           Tem certeza que deseja excluir <span className="font-semibold text-base-primary">{task.title}</span>?
-          Todas as subtarefas serão removidas.
+          Todas as etapas serão removidas.
         </p>
       </Modal>
     </Layout>

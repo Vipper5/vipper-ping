@@ -15,8 +15,8 @@ function formatDone(d?: string) {
 }
 
 const PERIOD_META: Record<TaskPeriod, { label: string; icon: typeof Sun; color: string }> = {
-  diaria: { label: 'Diária', icon: Sun, color: '#F5AE39' },
-  semanal: { label: 'Semanal', icon: CalendarRange, color: '#8637CC' },
+  diaria: { label: 'Task', icon: Sun, color: '#F5AE39' },
+  semanal: { label: 'Projeto', icon: CalendarRange, color: '#8637CC' },
 };
 
 function DoneCard({ task, projectName, users }: { task: Task; projectName?: string; users: ReturnType<typeof useUsers>['data'] }) {
@@ -83,8 +83,8 @@ export function Finalizadas() {
 
   const periodFilters: { key: 'all' | TaskPeriod; label: string }[] = [
     { key: 'all', label: `Todas (${scoped.length})` },
-    { key: 'diaria', label: `Diárias (${dailyCount})` },
-    { key: 'semanal', label: `Semanais (${weeklyCount})` },
+    { key: 'diaria', label: `Tasks (${dailyCount})` },
+    { key: 'semanal', label: `Projetos (${weeklyCount})` },
   ];
 
   return (
@@ -135,7 +135,7 @@ export function Finalizadas() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-base-muted">
           <CheckCheck size={32} className="mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Nenhuma task finalizada {period === 'diaria' ? 'diária' : period === 'semanal' ? 'semanal' : ''} ainda.</p>
+          <p className="text-sm">Nenhum item finalizado {period === 'diaria' ? '(tasks)' : period === 'semanal' ? '(projetos)' : ''} ainda.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

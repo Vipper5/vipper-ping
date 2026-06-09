@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ListChecks, CalendarRange, Sun, CalendarClock, Flag, Plus } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
@@ -42,15 +43,15 @@ function formatDate(d: string) {
 
 const STATUS_RANK: Record<string, number> = { em_andamento: 0, pendente: 1, concluida: 2 };
 
-// Período da task (legado sem período = diária).
+// Período da task (legado sem período conta como Task).
 function taskPeriod(t: Task): TaskPeriod {
   return t.period === 'semanal' ? 'semanal' : 'diaria';
 }
 
-// Metadados visuais de cada período (ícone + cor própria).
-const PERIOD_META: Record<TaskPeriod, { label: string; icon: typeof Sun; color: string }> = {
-  diaria: { label: 'Diária', icon: Sun, color: '#F5AE39' },
-  semanal: { label: 'Semanal', icon: CalendarRange, color: '#8637CC' },
+// Metadados visuais de cada nível (ícone + cor + rótulos singular/plural).
+const PERIOD_META: Record<TaskPeriod, { label: string; plural: string; icon: typeof Sun; color: string }> = {
+  diaria: { label: 'Task', plural: 'Tasks', icon: Sun, color: '#F5AE39' },
+  semanal: { label: 'Projeto', plural: 'Projetos', icon: CalendarRange, color: '#8637CC' },
 };
 
 // Cor por prioridade (acento lateral do card).
@@ -72,7 +73,7 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
   const isWeekly = period === 'semanal';
   const prio = PRIORITY_META[task.priority] ?? PRIORITY_META.media;
 
-  // Numa semanal, o progresso vem das diárias ligadas (mesmo critério do projeto/detalhe).
+  // Num projeto, o progresso vem das tasks ligadas (mesmo critério do cliente/detalhe).
   const dailies = isWeekly ? tasks.filter((t) => t.parentTaskId === task.id) : [];
   const dailiesDone = dailies.filter((d) => d.status === 'concluida').length;
   const weekProg = progressState(dailiesDone, dailies.length);
@@ -104,12 +105,12 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
         {task.title}
       </p>
 
-      {/* Projeto + prioridade */}
+      {/* Cliente + prioridade */}
       <div className="flex items-center justify-between gap-2">
         {project ? (
           <span className="text-xs font-mono text-viper-500 truncate">{project.name}</span>
         ) : (
-          <span className="text-xs font-mono text-base-muted truncate">sem projeto</span>
+          <span className="text-xs font-mono text-base-muted truncate">sem cliente</span>
         )}
         <span className="inline-flex items-center gap-1 text-[11px] font-medium shrink-0" style={{ color: prio.color }}>
           <Flag size={11} />
@@ -117,7 +118,7 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
         </span>
       </div>
 
-      {/* Progresso de subtarefas (apenas diárias) */}
+      {/* Progresso de etapas (apenas tasks) */}
       {!isWeekly && task.subtasks.length > 0 && (
         <div className="flex items-center gap-2">
           <div className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-carvao-surface3 overflow-hidden">
@@ -134,16 +135,16 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
       )}
 
       {isWeekly ? (
-        /* Rodapé da SEMANAL — barra de progresso semanal + responsáveis (só foto e nome) */
+        /* Rodapé do PROJETO — barra de progresso do projeto + responsáveis (só foto e nome) */
         <div className="mt-auto pt-1">
-          {/* Progresso semanal (diárias concluídas) */}
+          {/* Progresso do projeto (tasks concluídas) */}
           <div className="flex items-center justify-between mb-1.5">
             <span className="inline-flex items-center gap-1.5 text-xs text-base-muted">
               <CalendarRange size={12} style={{ color: pm.color }} />
-              Progresso semanal
+              Progresso do projeto
             </span>
             {weekProg.empty ? (
-              <span className="text-[11px] font-medium" style={{ color: pm.color }}>Sem diárias</span>
+              <span className="text-[11px] font-medium" style={{ color: pm.color }}>Sem tasks</span>
             ) : (
               <span className="text-sm font-num font-bold" style={{ color: weekProg.color }}>{weekProg.pct}%</span>
             )}
@@ -159,7 +160,7 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
             />
           </div>
           <p className="text-xs text-base-muted font-num mt-1.5">
-            {weekProg.empty ? 'Nenhuma diária ligada' : `${dailiesDone}/${dailies.length} diárias concluídas`}
+            {weekProg.empty ? 'Nenhuma task ligada' : `${dailiesDone}/${dailies.length} tasks concluídas`}
           </p>
 
           {/* Responsáveis — apenas foto e nome */}
@@ -212,9 +213,10 @@ export function Activities() {
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
   const [saving, setSaving] = useState(false);
 
+  const { dark } = useTheme();
   const isSocio = user?.role === 'socio';
 
-  // Semanais do projeto escolhido — possíveis "pais" de uma diária.
+  // Projetos do cliente escolhido — possíveis "pais" de uma task.
   const weeklyOptions = tasks.filter(
     (t) => taskPeriod(t) === 'semanal' && t.projectId === createForm.projectId,
   );
@@ -268,7 +270,7 @@ export function Activities() {
       t.assignedTo.includes(filterAssignee),
   );
 
-  // Contagens do toggle Diário/Semanal já refletindo o filtro de responsável.
+  // Contagens do toggle Tasks/Projetos já refletindo o filtro de responsável.
   const periodCounts = {
     diaria: assigneeScoped.filter((t) => taskPeriod(t) === 'diaria').length,
     semanal: assigneeScoped.filter((t) => taskPeriod(t) === 'semanal').length,
@@ -291,7 +293,7 @@ export function Activities() {
       return a.dueDate.localeCompare(b.dueDate);
     });
 
-  // Filtros de status com cor + brilho neon (mesmo padrão da aba Projetos).
+  // Filtros de status com cor + brilho neon.
   // Ordem: Todas → Pendente → Em andamento → Concluída.
   const statusFilters: { key: string; label: string }[] = [
     { key: 'all', label: 'Todas' },
@@ -299,15 +301,15 @@ export function Activities() {
     { key: 'em_andamento', label: 'Em andamento' },
     { key: 'concluida', label: 'Concluída' },
   ];
-  const filterColors: Record<string, { base: string; light: string; glow: string }> = {
-    all: { base: '#8637CC', light: '#AD7BEB', glow: '134,55,204' },
-    pendente: { base: '#E54056', light: '#FF6B7E', glow: '229,64,86' },
-    em_andamento: { base: '#F5AE39', light: '#FFC766', glow: '245,174,57' },
-    concluida: { base: '#15BB77', light: '#2EE6A0', glow: '0,255,148' },
+  const filterColors: Record<string, { base: string; light: string; glow: string; darkText: string }> = {
+    all:         { base: '#8637CC', light: '#AD7BEB', glow: '134,55,204', darkText: '#7B2FBE' },
+    pendente:    { base: '#E54056', light: '#FF6B7E', glow: '229,64,86',  darkText: '#CC2033' },
+    em_andamento:{ base: '#F5AE39', light: '#FFC766', glow: '245,174,57', darkText: '#8B5000' },
+    concluida:   { base: '#15BB77', light: '#2EE6A0', glow: '0,255,148',  darkText: '#0D7A50' },
   };
 
-  // Toggle de período (segmented control).
-  const periodOptions: TaskPeriod[] = ['diaria', 'semanal'];
+  // Projetos primeiro, Tasks em segundo.
+  const periodOptions: TaskPeriod[] = ['semanal', 'diaria'];
 
   return (
     <Layout
@@ -321,7 +323,7 @@ export function Activities() {
         ) : undefined
       }
     >
-      {/* Toggle Diário / Semanal */}
+      {/* Toggle Tasks / Projetos */}
       <div className="mb-5">
         <div
           className="inline-flex items-center gap-1 p-1 rounded-lg border"
@@ -339,12 +341,12 @@ export function Activities() {
                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150"
                 style={
                   active
-                    ? { backgroundColor: meta.color, color: '#fff', boxShadow: `0 0 16px ${meta.color}66` }
+                    ? { backgroundColor: meta.color, color: '#fff', boxShadow: dark ? `0 0 10px ${meta.color}44` : 'none' }
                     : { color: 'var(--text-muted)', backgroundColor: 'transparent' }
                 }
               >
                 <Icon size={15} />
-                {meta.label === 'Diária' ? 'Diário' : 'Semanal'}
+                {meta.plural}
                 <span
                   className="text-xs font-num px-1.5 rounded"
                   style={active ? { backgroundColor: 'rgba(255,255,255,0.22)' } : { backgroundColor: `${meta.color}1f`, color: meta.color }}
@@ -364,18 +366,19 @@ export function Activities() {
             const active = filterStatus === f.key;
             const isHover = hoveredFilter === f.key;
             const c = filterColors[f.key];
+            const inactiveText = dark ? (isHover ? c.light : c.base) : (isHover ? c.light : c.darkText);
             const style: React.CSSProperties = active
               ? {
                   backgroundColor: isHover ? c.light : c.base,
                   borderColor: isHover ? c.light : c.base,
                   color: '#fff',
-                  boxShadow: `0 0 16px rgba(${c.glow},${isHover ? 0.6 : 0.42})`,
+                  boxShadow: dark ? `0 0 12px rgba(${c.glow},${isHover ? 0.35 : 0.22})` : 'none',
                 }
               : {
-                  backgroundColor: isHover ? `rgba(${c.glow},0.12)` : 'transparent',
-                  borderColor: isHover ? c.light : c.base,
-                  color: isHover ? c.light : c.base,
-                  boxShadow: isHover ? `0 0 14px rgba(${c.glow},0.32)` : 'none',
+                  backgroundColor: isHover ? `rgba(${c.glow},0.10)` : 'transparent',
+                  borderColor: inactiveText,
+                  color: inactiveText,
+                  boxShadow: 'none',
                 };
             return (
               <button
@@ -392,7 +395,7 @@ export function Activities() {
                   style={
                     active
                       ? { backgroundColor: 'rgba(255,255,255,0.2)' }
-                      : { backgroundColor: `rgba(${c.glow},0.14)`, color: isHover ? c.light : c.base }
+                      : { backgroundColor: `rgba(${c.glow},0.12)`, color: inactiveText }
                   }
                 >
                   {counts[f.key as keyof typeof counts]}
@@ -427,7 +430,7 @@ export function Activities() {
         <div className="text-center py-16 text-base-muted">
           <CheckCircle2 size={32} className="mx-auto mb-2 opacity-30" />
           <p className="text-sm">
-            Nenhuma task {period === 'semanal' ? 'semanal' : 'diária'} encontrada.
+            {period === 'semanal' ? 'Nenhum projeto encontrado.' : 'Nenhuma task encontrada.'}
           </p>
         </div>
       ) : (
@@ -443,7 +446,7 @@ export function Activities() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Nova task"
-        description="Crie uma atividade diária ou semanal."
+        description="Crie uma task ou um projeto."
         size="md"
         footer={
           <>
@@ -478,21 +481,21 @@ export function Activities() {
           </FormField>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Período">
+            <FormField label="Tipo">
               <Select
                 value={createForm.period}
                 onChange={(e) => setCreateForm((f) => ({ ...f, period: e.target.value as TaskPeriod, parentTaskId: '' }))}
               >
-                <option value="diaria">Diária</option>
-                <option value="semanal">Semanal</option>
+                <option value="diaria">Task</option>
+                <option value="semanal">Projeto</option>
               </Select>
             </FormField>
-            <FormField label="Projeto">
+            <FormField label="Cliente">
               <Select
                 value={createForm.projectId}
                 onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value, parentTaskId: '' }))}
               >
-                <option value="">Sem projeto</option>
+                <option value="">Sem cliente</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -500,9 +503,9 @@ export function Activities() {
             </FormField>
           </div>
 
-          {/* Semanal pai — só para diária, quando há projeto com semanais */}
+          {/* Projeto pai — só para task, quando o cliente tem projetos */}
           {createForm.period === 'diaria' && createForm.projectId && weeklyOptions.length > 0 && (
-            <FormField label="Vincular a uma semanal" hint="Opcional — liga a diária a um objetivo semanal">
+            <FormField label="Vincular a um projeto" hint="Opcional — liga a task a um projeto">
               <Select
                 value={createForm.parentTaskId}
                 onChange={(e) => setCreateForm((f) => ({ ...f, parentTaskId: e.target.value }))}

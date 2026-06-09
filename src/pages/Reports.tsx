@@ -78,9 +78,9 @@ export function Reports() {
           <span className="text-xs font-mono text-base-muted uppercase tracking-wider">Filtros</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <FormField label="Projeto">
+          <FormField label="Cliente">
             <Select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
-              <option value="all">Todos os projetos</option>
+              <option value="all">Todos os clientes</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
@@ -147,7 +147,7 @@ export function Reports() {
           </div>
 
           <div className="card rounded-md p-5">
-            <h3 className="text-xs font-mono text-base-muted uppercase tracking-wider mb-3">Por projeto</h3>
+            <h3 className="text-xs font-mono text-base-muted uppercase tracking-wider mb-3">Por cliente</h3>
             <div className="space-y-2">
               {byProject.map((x) => (
                 <div key={x.name} className="flex items-center gap-3">
@@ -186,7 +186,7 @@ export function Reports() {
               <tr className="border-b border-base" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-subtle)' }}>
                 <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Task</th>
                 <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Quem fez</th>
-                <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Projeto</th>
+                <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Cliente</th>
                 <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Concluída em</th>
                 <th className="text-left px-5 py-3 text-xs font-mono text-base-muted uppercase tracking-wider">Prior.</th>
               </tr>

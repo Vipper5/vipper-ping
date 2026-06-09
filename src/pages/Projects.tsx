@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { Link } from 'react-router-dom';
 import { Plus, ArrowRight, Pencil, CalendarClock, ListChecks, Target } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
@@ -36,9 +37,10 @@ function daysUntil(d: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
-// Cor de acento do card por status do projeto.
+// Cor de acento do card por status do cliente.
 const STATUS_ACCENT: Record<ProjectStatus, string> = {
   Ativo: '#15BB77',
+  'Em Desenvolvimento': '#0891B2',
   Pausado: '#F5AE39',
   'Concluído': '#5294E6',
 };
@@ -109,6 +111,7 @@ const defaultForm: ProjectFormData = {
 
 export function Projects() {
   const { user } = useAuth();
+  const { dark } = useTheme();
   const toast = useToast();
   const { data: projects, loading, error, reload } = useProjects();
   const { data: tasks } = useTasks();
@@ -194,6 +197,7 @@ export function Projects() {
   const counts = {
     all: projects.length,
     Ativo: projects.filter((p) => p.status === 'Ativo').length,
+    'Em Desenvolvimento': projects.filter((p) => p.status === 'Em Desenvolvimento').length,
     Pausado: projects.filter((p) => p.status === 'Pausado').length,
     'Concluído': projects.filter((p) => p.status === 'Concluído').length,
   };
@@ -203,27 +207,28 @@ export function Projects() {
   const filters: { key: string; label: string }[] = [
     { key: 'all', label: 'Todos' },
     { key: 'Ativo', label: 'Ativos' },
+    { key: 'Em Desenvolvimento', label: 'Em Desenvolvimento' },
     { key: 'Pausado', label: 'Pausados' },
     { key: 'Concluído', label: 'Concluídos' },
   ];
 
-  // Cor característica de cada filtro: Todos=roxo, Ativos=verde, Pausados=amarelo, Concluídos=azul.
-  // `glow` é o RGB usado tanto no brilho neon quanto nos fundos translúcidos.
-  const filterColors: Record<string, { base: string; light: string; glow: string }> = {
-    all: { base: '#8637CC', light: '#AD7BEB', glow: '134,55,204' },
-    Ativo: { base: '#15BB77', light: '#2EE6A0', glow: '0,255,148' },
-    Pausado: { base: '#F5AE39', light: '#FFC766', glow: '245,174,57' },
-    'Concluído': { base: '#5294E6', light: '#7DB0F2', glow: '82,148,230' },
+  // Cor de cada filtro. `darkText` = texto escuro em light mode (garante contraste no fundo claro).
+  const filterColors: Record<string, { base: string; light: string; glow: string; darkText: string }> = {
+    all:               { base: '#8637CC', light: '#AD7BEB', glow: '134,55,204', darkText: '#7B2FBE' },
+    Ativo:             { base: '#15BB77', light: '#2EE6A0', glow: '0,255,148',  darkText: '#0D7A50' },
+    'Em Desenvolvimento': { base: '#0891B2', light: '#22D3EE', glow: '8,145,178', darkText: '#0C6C87' },
+    Pausado:           { base: '#F5AE39', light: '#FFC766', glow: '245,174,57', darkText: '#8B5000' },
+    'Concluído':       { base: '#5294E6', light: '#7DB0F2', glow: '82,148,230', darkText: '#3060A8' },
   };
 
   return (
     <Layout
-      title="Projetos"
+      title="Clientes"
       subtitle={`${counts.Ativo} ativos · ${projects.length} no total`}
       action={
         isSocio ? (
           <Button variant="primary" size="sm" onClick={openCreate}>
-            <Plus size={15} /> Novo projeto
+            <Plus size={15} /> Novo cliente
           </Button>
         ) : undefined
       }
@@ -234,18 +239,19 @@ export function Projects() {
           const active = statusFilter === f.key;
           const isHover = hoveredFilter === f.key;
           const c = filterColors[f.key];
+          const inactiveText = dark ? (isHover ? c.light : c.base) : (isHover ? c.light : c.darkText);
           const style: React.CSSProperties = active
             ? {
                 backgroundColor: isHover ? c.light : c.base,
                 borderColor: isHover ? c.light : c.base,
                 color: '#fff',
-                boxShadow: `0 0 16px rgba(${c.glow},${isHover ? 0.6 : 0.42})`,
+                boxShadow: dark ? `0 0 12px rgba(${c.glow},${isHover ? 0.35 : 0.22})` : 'none',
               }
             : {
-                backgroundColor: isHover ? `rgba(${c.glow},0.12)` : 'transparent',
-                borderColor: isHover ? c.light : c.base,
-                color: isHover ? c.light : c.base,
-                boxShadow: isHover ? `0 0 14px rgba(${c.glow},0.32)` : 'none',
+                backgroundColor: isHover ? `rgba(${c.glow},0.10)` : 'transparent',
+                borderColor: inactiveText,
+                color: inactiveText,
+                boxShadow: 'none',
               };
           return (
             <button
@@ -262,7 +268,7 @@ export function Projects() {
                 style={
                   active
                     ? { backgroundColor: 'rgba(255,255,255,0.2)' }
-                    : { backgroundColor: `rgba(${c.glow},0.14)`, color: isHover ? c.light : c.base }
+                    : { backgroundColor: `rgba(${c.glow},0.12)`, color: inactiveText }
                 }
               >
                 {counts[f.key as keyof typeof counts]}
@@ -273,7 +279,7 @@ export function Projects() {
       </div>
 
       {loading ? (
-        <Loading label="Carregando projetos…" />
+        <Loading label="Carregando clientes…" />
       ) : error ? (
         <ErrorState message={error} />
       ) : filtered.length === 0 ? (
@@ -281,7 +287,7 @@ export function Projects() {
           <div className="w-12 h-12 mx-auto rounded-md border-2 border-dashed flex items-center justify-center mb-3" style={{ borderColor: 'var(--border)' }}>
             <span className="text-xl">📂</span>
           </div>
-          <p className="text-sm">Nenhum projeto encontrado.</p>
+          <p className="text-sm">Nenhum cliente encontrado.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -313,7 +319,7 @@ export function Projects() {
                     {isSocio && (
                       <button
                         onClick={(e) => openEdit(project, e)}
-                        title="Editar projeto"
+                        title="Editar cliente"
                         className="p-1 rounded text-base-muted hover:text-viper-500 hover:bg-viper-50 dark:hover:bg-carvao-surface2 transition-colors opacity-0 group-hover:opacity-100"
                       >
                         <Pencil size={13} />
@@ -395,32 +401,32 @@ export function Projects() {
       <Modal
         open={showModal}
         onClose={cancelModal}
-        title={editProject ? 'Editar projeto' : 'Novo projeto'}
+        title={editProject ? 'Editar cliente' : 'Novo cliente'}
         size="lg"
         footer={
           <>
             <Button variant="destructive" onClick={cancelModal}>Cancelar</Button>
             <Button variant="primary" onClick={handleSave} disabled={!form.name.trim() || saving}>
-              {saving ? 'Salvando…' : editProject ? 'Salvar alterações' : 'Criar projeto'}
+              {saving ? 'Salvando…' : editProject ? 'Salvar alterações' : 'Criar cliente'}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Nome do projeto" required>
+            <FormField label="Nome do cliente" required>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="apicore-v2"
+                placeholder="acme-corp"
                 className="font-mono"
               />
             </FormField>
-            <FormField label="Cliente" required>
+            <FormField label="Empresa" required>
               <Input
                 value={form.client}
                 onChange={(e) => setForm((f) => ({ ...f, client: e.target.value }))}
-                placeholder="Nome do cliente"
+                placeholder="Nome da empresa"
               />
             </FormField>
           </div>
@@ -429,6 +435,7 @@ export function Projects() {
             <FormField label="Status">
               <Select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ProjectStatus }))}>
                 <option>Ativo</option>
+                <option>Em Desenvolvimento</option>
                 <option>Pausado</option>
                 <option>Concluído</option>
               </Select>
@@ -455,7 +462,7 @@ export function Projects() {
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               rows={2}
-              placeholder="Descreva o objetivo do projeto..."
+              placeholder="Descreva o objetivo do cliente..."
             />
           </FormField>
 

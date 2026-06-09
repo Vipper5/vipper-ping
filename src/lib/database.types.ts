@@ -176,6 +176,7 @@ export type Database = {
           author_id: string | null
           created_at: string
           id: string
+          image_url: string | null
           project_id: string
           text: string
         }
@@ -183,6 +184,7 @@ export type Database = {
           author_id?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           project_id: string
           text: string
         }
@@ -190,6 +192,7 @@ export type Database = {
           author_id?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           project_id?: string
           text?: string
         }
@@ -510,7 +513,7 @@ export type Database = {
     }
     Enums: {
       event_category: "reuniao" | "lembrete"
-      project_status: "Ativo" | "Pausado" | "Concluído"
+      project_status: "Ativo" | "Pausado" | "Concluído" | "Em Desenvolvimento"
       task_period: "diaria" | "semanal"
       task_priority: "baixa" | "media" | "alta"
       task_status: "pendente" | "em_andamento" | "concluida"
@@ -643,7 +646,7 @@ export const Constants = {
   public: {
     Enums: {
       event_category: ["reuniao", "lembrete"],
-      project_status: ["Ativo", "Pausado", "Concluído"],
+      project_status: ["Ativo", "Em Desenvolvimento", "Pausado", "Concluído"],
       task_period: ["diaria", "semanal"],
       task_priority: ["baixa", "media", "alta"],
       task_status: ["pendente", "em_andamento", "concluida"],

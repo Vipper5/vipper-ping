@@ -140,13 +140,13 @@ export function MemberDetail() {
   const memberTasks = tasks.filter((t) => t.assignedTo.includes(member.id));
   const completedTasks = memberTasks.filter((t) => t.status === 'concluida');
 
-  // Barras de progressão diária/semanal (por prazo — como antes).
+  // Barras de progressão de hoje/semana (por prazo — como antes).
   const todayTasks = memberTasks.filter((t) => isToday(t.dueDate));
   const weekTasks = memberTasks.filter((t) => isThisWeek(t.dueDate));
   const todayDone = todayTasks.filter((t) => t.status === 'concluida').length;
   const weekDone = weekTasks.filter((t) => t.status === 'concluida').length;
 
-  // Atividades concluídas por período (diárias x semanais) — usadas nos mini cards/popup.
+  // Atividades concluídas por período (tasks x projetos) — usadas nos mini cards/popup.
   const dailyDone = memberTasks.filter((t) => taskPeriod(t) === 'diaria' && t.status === 'concluida');
   const weeklyDone = memberTasks.filter((t) => taskPeriod(t) === 'semanal' && t.status === 'concluida');
   const modalTasks = doneModal === 'diaria' ? dailyDone : doneModal === 'semanal' ? weeklyDone : doneModal === 'all' ? completedTasks : [];
@@ -248,14 +248,14 @@ export function MemberDetail() {
             {/* Mini cards de atividades feitas — clique abre o popup com a lista */}
             <div className="grid grid-cols-2 gap-3 mt-4">
               <DoneStat
-                label="Diárias feitas"
+                label="Tasks feitas"
                 icon={<Sun size={14} />}
                 count={dailyDone.length}
                 color="#F5AE39"
                 onClick={() => setDoneModal('diaria')}
               />
               <DoneStat
-                label="Semanais feitas"
+                label="Projetos feitos"
                 icon={<CalendarRange size={14} />}
                 count={weeklyDone.length}
                 color="#8637CC"
@@ -282,14 +282,14 @@ export function MemberDetail() {
         <div className="lg:col-span-2 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <ProgressMini
-              label="Progresso diário"
+              label="Progresso de hoje"
               icon={<Sun size={15} />}
               done={todayDone}
               total={todayTasks.length}
               subtitle={todayTasks.length === 0 ? 'Sem tarefas hoje' : `${todayTasks.length} com prazo hoje`}
             />
             <ProgressMini
-              label="Progresso semanal"
+              label="Progresso da semana"
               icon={<CalendarRange size={15} />}
               done={weekDone}
               total={weekTasks.length}
@@ -388,7 +388,7 @@ export function MemberDetail() {
       <Modal
         open={doneModal !== null}
         onClose={() => setDoneModal(null)}
-        title={doneModal === 'all' ? 'Todas as tasks concluídas' : doneModal === 'semanal' ? 'Semanais concluídas' : 'Diárias concluídas'}
+        title={doneModal === 'all' ? 'Todas as tasks concluídas' : doneModal === 'semanal' ? 'Projetos concluídos' : 'Tasks concluídas'}
         description={`${modalTasks.length} ${modalTasks.length === 1 ? 'atividade concluída' : 'atividades concluídas'} por ${member.name}`}
         size="md"
       >

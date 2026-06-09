@@ -98,7 +98,7 @@ function mapProject(row: any): Project {
       .map((d: any) => ({ title: d.title, url: d.url, addedAt: d.added_at }))
       .sort((a: any, b: any) => a.addedAt.localeCompare(b.addedAt)),
     notes: (row.project_notes ?? [])
-      .map((n: any) => ({ id: n.id, text: n.text, author: n.author_id ?? '', createdAt: n.created_at }))
+      .map((n: any) => ({ id: n.id, text: n.text, author: n.author_id ?? '', createdAt: n.created_at, imageUrl: n.image_url ?? undefined }))
       .sort((a: any, b: any) => a.createdAt.localeCompare(b.createdAt)),
     objectives: (row.project_objectives ?? [])
       .map((o: any) => ({
@@ -185,7 +185,7 @@ export async function updateProject(id: string, input: ProjectInput): Promise<vo
 
 export async function deleteProject(id: string): Promise<void> {
   // Responsáveis, docs e notas são removidos em cascata (ON DELETE CASCADE).
-  // As tarefas do projeto têm project_id setado para NULL (ON DELETE SET NULL).
+  // As tasks do cliente têm project_id setado para NULL (ON DELETE SET NULL).
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) throw error;
 }
@@ -200,10 +200,15 @@ async function syncProjectResponsibles(projectId: string, responsibles: string[]
   }
 }
 
-export async function addProjectNote(projectId: string, text: string, authorId: string): Promise<void> {
+export async function addProjectNote(
+  projectId: string,
+  text: string,
+  authorId: string,
+  imageUrl?: string,
+): Promise<void> {
   const { error } = await supabase
     .from('project_notes')
-    .insert({ project_id: projectId, text, author_id: authorId });
+    .insert({ project_id: projectId, text, author_id: authorId, image_url: imageUrl ?? null });
   if (error) throw error;
 }
 
@@ -214,8 +219,21 @@ export async function addProjectDoc(projectId: string, title: string, url: strin
   if (error) throw error;
 }
 
+/** Faz upload de um arquivo para o bucket 'project-files' e retorna a URL pública. */
+export async function uploadProjectFile(
+  folder: string,
+  file: File,
+): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'bin';
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from('project-files').upload(path, file, { upsert: false });
+  if (error) throw error;
+  const { data } = supabase.storage.from('project-files').getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // ------------------------------------------------------------------
-// Objetivos do projeto (checklist)
+// Objetivos do cliente (checklist)
 // ------------------------------------------------------------------
 
 export async function addProjectObjective(
@@ -325,7 +343,7 @@ export interface TaskInput {
   parentTaskId?: string;
   /** Anotação livre (opcional). */
   note?: string;
-  /** Títulos das subtarefas a criar junto (opcional). */
+  /** Títulos das etapas a criar junto (opcional). */
   subtasks?: string[];
 }
 
@@ -363,7 +381,7 @@ export async function createTask(input: TaskInput): Promise<string> {
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  // Responsáveis e subtarefas são removidos em cascata (ON DELETE CASCADE).
+  // Responsáveis e etapas são removidos em cascata (ON DELETE CASCADE).
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) throw error;
 }
@@ -441,7 +459,7 @@ export async function addSubtask(
   if (error) throw error;
 }
 
-/** Edita o conteúdo de uma subtarefa (título e/ou descrição). */
+/** Edita o conteúdo de uma etapa (título e/ou descrição). */
 export async function updateSubtask(
   subtaskId: string,
   fields: { title?: string; description?: string | null },

@@ -18,11 +18,11 @@ const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 // Categorias da agenda — cada uma com sua cor
 type Category = 'entrega' | 'tarefa' | 'reuniao' | 'lembrete' | 'conclusao';
 const CATEGORY: Record<Category, { label: string; color: string }> = {
-  entrega: { label: 'Task Semanal', color: '#8637CC' },
-  tarefa: { label: 'Task Diária', color: '#5294E6' },
+  entrega: { label: 'Projeto', color: '#8637CC' },
+  tarefa: { label: 'Task', color: '#5294E6' },
   reuniao: { label: 'Reunião', color: '#F5AE39' },
   lembrete: { label: 'Lembrete', color: '#15BB77' },
-  conclusao: { label: 'Conclusão de projeto', color: '#E54056' },
+  conclusao: { label: 'Conclusão de cliente', color: '#E54056' },
 };
 
 function pad(n: number) {
@@ -161,7 +161,7 @@ export function Agenda() {
     setDayTab('agenda');
   };
 
-  // Item clicável → abre o detalhe (tasks/eventos). Conclusões de projeto continuam como link.
+  // Item clicável → abre o detalhe (tasks/eventos). Conclusões de cliente continuam como link.
   const openDetail = (it: CalItem) => {
     setDetail(it);
     setDayTab('agenda');
@@ -456,43 +456,58 @@ export function Agenda() {
                 </button>
               </div>
 
-              {/* LISTA DO DIA */}
+              {/* LISTA DO DIA — agrupada por categoria */}
               {dayTab === 'agenda' && !detail && (
                 <>
                   {dayItems.length === 0 ? (
                     <p className="text-sm text-base-muted text-center py-8">Nada agendado para este dia.</p>
                   ) : (
-                    <div className="space-y-2">
-                      {dayItems.map((it) => {
-                        const inner = (
-                          <>
-                            <span className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: it.color, minHeight: 36 }} />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium truncate ${it.task?.status === 'concluida' ? 'line-through text-base-muted' : 'text-base-primary'}`}>
-                                {it.event?.time ? `${it.event.time} · ` : ''}{it.title}
-                              </p>
-                              <p className="text-xs text-base-muted font-mono truncate">
-                                {it.task && `${getProjectName(it.task.projectId) || 'Sem projeto'} · ${it.task.assignedTo.map((id) => getUserName(id)).join(' + ')}`}
-                                {it.event && it.event.members.map((id) => getUserName(id)).join(', ')}
-                                {it.category === 'conclusao' && getProjectName(it.projectId!)}
-                              </p>
+                    <div className="space-y-5">
+                      {(Object.keys(CATEGORY) as Category[])
+                        .map((cat) => ({ cat, items: dayItems.filter((it) => it.category === cat) }))
+                        .filter(({ items }) => items.length > 0)
+                        .map(({ cat, items }) => (
+                          <div key={cat}>
+                            {/* Cabeçalho da categoria */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: CATEGORY[cat].color }} />
+                              <span className="text-xs font-mono font-semibold uppercase tracking-wider" style={{ color: CATEGORY[cat].color }}>
+                                {CATEGORY[cat].label}
+                              </span>
+                              <span className="text-xs font-mono text-base-muted">({items.length})</span>
                             </div>
-                            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: tint(it.color, 0.16), color: it.color }}>
-                              {CATEGORY[it.category].label.split(' ')[0]}
-                            </span>
-                            {it.task && <StatusBadge status={it.task.status} />}
-                          </>
-                        );
-                        return it.category === 'conclusao' && it.to ? (
-                          <Link key={it.id} to={it.to} onClick={closeDay} className="flex items-center gap-3 p-3 rounded-sm transition-colors hover:bg-subtle w-full text-left" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-                            {inner}
-                          </Link>
-                        ) : (
-                          <button key={it.id} onClick={() => openDetail(it)} className="flex items-center gap-3 p-3 rounded-sm transition-colors hover:bg-subtle w-full text-left" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-                            {inner}
-                          </button>
-                        );
-                      })}
+                            <div className="space-y-2">
+                              {items.map((it) => {
+                                const inner = (
+                                  <>
+                                    <span className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: it.color, minHeight: 44 }} />
+                                    <div className="flex-1 min-w-0 py-0.5">
+                                      <p className={`text-sm font-semibold leading-snug ${it.task?.status === 'concluida' ? 'line-through text-base-muted' : 'text-base-primary'}`}>
+                                        {it.event?.time ? `${it.event.time} · ` : ''}{it.category === 'conclusao' ? it.title.replace('Conclusão: ', '') : it.title}
+                                      </p>
+                                      <p className="text-xs text-base-muted font-mono mt-0.5 truncate">
+                                        {it.task && `${getProjectName(it.task.projectId) || 'Sem cliente'} · ${it.task.assignedTo.map((id) => getUserName(id)).join(' + ')}`}
+                                        {it.event && it.event.members.map((id) => getUserName(id)).join(', ')}
+                                        {it.category === 'conclusao' && getProjectName(it.projectId!)}
+                                      </p>
+                                    </div>
+                                    {it.task && <StatusBadge status={it.task.status} />}
+                                  </>
+                                );
+                                return it.category === 'conclusao' && it.to ? (
+                                  <Link key={it.id} to={it.to} onClick={closeDay} className="flex items-center gap-3 p-3.5 rounded-md transition-colors hover:bg-subtle w-full text-left" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                                    {inner}
+                                  </Link>
+                                ) : (
+                                  <button key={it.id} onClick={() => openDetail(it)} className="flex items-center gap-3 p-3.5 rounded-md transition-colors hover:bg-subtle w-full text-left" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                                    {inner}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))
+                      }
                     </div>
                   )}
                 </>
@@ -541,7 +556,7 @@ export function Agenda() {
 
                   {detail.task && detail.task.projectId && getProjectName(detail.task.projectId) && (
                     <div className="text-sm">
-                      <span className="text-base-muted">Projeto: </span>
+                      <span className="text-base-muted">Cliente: </span>
                       <Link to={`/projetos/${detail.task.projectId}`} onClick={closeDay} className="text-viper-500 hover:text-viper-400 font-medium transition-colors">{getProjectName(detail.task.projectId)}</Link>
                     </div>
                   )}
@@ -660,7 +675,7 @@ export function Agenda() {
                             <option value="alta">Alta</option>
                           </Select>
                         </FormField>
-                        <FormField label="Projeto">
+                        <FormField label="Cliente">
                           <Select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}>
                             <option value="">Nenhum</option>
                             {projects.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 
@@ -14,6 +14,7 @@ interface LayoutProps {
 
 export function Layout({ children, title, subtitle, action, back }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
@@ -45,14 +46,14 @@ export function Layout({ children, title, subtitle, action, back }: LayoutProps)
             </button>
 
             {back && (
-              <Link
-                to={back.to}
+              <button
+                onClick={() => navigate(-1)}
                 title={`Voltar para ${back.label}`}
                 className="shrink-0 inline-flex items-center gap-1.5 -ml-2 px-2 py-1.5 rounded-md text-sm font-medium text-base-muted hover:text-viper-500 hover:bg-subtle transition-colors"
               >
                 <ArrowLeft size={18} />
                 <span className="hidden sm:inline">{back.label}</span>
-              </Link>
+              </button>
             )}
             <div className="min-w-0">
               <h1 className="text-lg sm:text-xl font-bold text-base-primary tracking-tight truncate">{title}</h1>

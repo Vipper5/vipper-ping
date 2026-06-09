@@ -24,7 +24,7 @@ function isToday(d: string) {
   return d === new Date().toISOString().split('T')[0];
 }
 
-// Período da task (legado sem período = diária) — mesma regra da página de Tasks.
+// Período da task (legado sem período conta como Task) — mesma regra da página de Tasks.
 function taskPeriod(t: Task): 'diaria' | 'semanal' {
   return t.period === 'semanal' ? 'semanal' : 'diaria';
 }
@@ -100,7 +100,7 @@ function ProgressTile({ label, done, total, subtitle, icon, onClick }: ProgressT
   );
 }
 
-// Wide member strip — progresso SEMANAL do membro (sócio vê os demais membros)
+// Wide member strip — progresso de PROJETOS do membro (sócio vê os demais membros)
 function MemberWeekCard({ member, tasks }: { member: User; tasks: Task[] }) {
   const weekTasks = tasks.filter((t) => t.assignedTo.includes(member.id) && taskPeriod(t) === 'semanal');
   const done = weekTasks.filter((t) => t.status === 'concluida').length;
@@ -122,7 +122,7 @@ function MemberWeekCard({ member, tasks }: { member: User; tasks: Task[] }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between text-xs font-mono mb-1.5">
-          <span className="text-base-muted uppercase tracking-wider">Progresso semanal</span>
+          <span className="text-base-muted uppercase tracking-wider">Progresso de projetos</span>
           {empty ? (
             <span className="font-semibold" style={{ color }}>Aguarde por novas atividades</span>
           ) : (
@@ -139,7 +139,7 @@ function MemberWeekCard({ member, tasks }: { member: User; tasks: Task[] }) {
 
       <div className="flex gap-3 shrink-0">
         <div className="rounded-sm px-4 py-2 text-center" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-          <p className="text-xs font-mono text-base-muted">Semana</p>
+          <p className="text-xs font-mono text-base-muted">Projetos</p>
           <p className="text-lg font-bold font-num text-base-primary">{weekTasks.length}</p>
         </div>
         <div className="rounded-sm px-4 py-2 text-center" style={{ backgroundColor: 'var(--bg-subtle)' }}>
@@ -166,9 +166,9 @@ export function Dashboard() {
   const loading = tasksLoading || projectsLoading || usersLoading;
 
   const myTasks = allTasks.filter((t) => t.assignedTo.includes(user.id));
-  // "Tasks de hoje" lista apenas as diárias com prazo para hoje.
+  // "Tasks de hoje" lista apenas as tasks com prazo para hoje.
   const todayTasks = myTasks.filter((t) => isToday(t.dueDate) && taskPeriod(t) === 'diaria');
-  // Diárias x semanais por período (mesma taxonomia da página de Tasks).
+  // Tasks x projetos por período (mesma taxonomia da página de Tasks).
   const dailyTasks = myTasks.filter((t) => taskPeriod(t) === 'diaria');
   const weeklyTasks = myTasks.filter((t) => taskPeriod(t) === 'semanal');
   const completedTasks = myTasks.filter((t) => t.status === 'concluida');
@@ -190,8 +190,8 @@ export function Dashboard() {
   const otherMembers = isSocio ? users.filter((u) => u.id !== user.id) : [];
 
   const modalTasks: Task[] = periodModal === 'diario' ? dailyTasks : periodModal === 'semanal' ? weeklyTasks : [];
-  const modalTitle = periodModal === 'diario' ? 'Tasks diárias' : 'Tasks semanais';
-  const modalDesc = periodModal === 'diario' ? 'Suas atividades diárias' : 'Suas atividades semanais';
+  const modalTitle = periodModal === 'diario' ? 'Tasks' : 'Projetos';
+  const modalDesc = periodModal === 'diario' ? 'Suas tasks' : 'Seus projetos';
 
   if (loading) {
     return (
@@ -259,24 +259,24 @@ export function Dashboard() {
 
         {/* Progress tiles — compactos, lado a lado (col 3 e 4) */}
         <ProgressTile
-          label="Diário"
+          label="Tasks"
           done={dailyDone}
           total={dailyTasks.length}
           icon={<Sun size={15} />}
-          subtitle={dailyTasks.length === 0 ? 'Sem tasks diárias' : `${dailyTasks.length} ${dailyTasks.length === 1 ? 'task diária' : 'tasks diárias'}`}
+          subtitle={dailyTasks.length === 0 ? 'Sem tasks' : `${dailyTasks.length} ${dailyTasks.length === 1 ? 'task' : 'tasks'}`}
           onClick={() => setPeriodModal('diario')}
         />
         <ProgressTile
-          label="Semanal"
+          label="Projetos"
           done={weeklyDone}
           total={weeklyTasks.length}
           icon={<CalendarRange size={15} />}
-          subtitle={weeklyTasks.length === 0 ? 'Sem tasks semanais' : `${weeklyTasks.length} ${weeklyTasks.length === 1 ? 'task semanal' : 'tasks semanais'}`}
+          subtitle={weeklyTasks.length === 0 ? 'Sem projetos' : `${weeklyTasks.length} ${weeklyTasks.length === 1 ? 'projeto' : 'projetos'}`}
           onClick={() => setPeriodModal('semanal')}
         />
 
         {/* KPIs pequenos — preenchem a linha de baixo do lado direito */}
-        <KpiCard label="Projetos ativos" value={activeProjects.length} icon={<FolderKanban size={16} />} />
+        <KpiCard label="Clientes ativos" value={activeProjects.length} icon={<FolderKanban size={16} />} />
         <KpiCard
           label="Concluídas no mês"
           value={completedTasks.length}
@@ -321,7 +321,7 @@ export function Dashboard() {
                     {task.title}
                   </p>
                   <p className="text-xs text-base-muted font-mono">
-                    {projects.find((p) => p.id === task.projectId)?.name ?? 'Sem projeto'}
+                    {projects.find((p) => p.id === task.projectId)?.name ?? 'Sem cliente'}
                   </p>
                 </div>
                 <StatusBadge status={task.status} />
