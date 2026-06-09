@@ -52,13 +52,11 @@ export function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-viper-500 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-white" stroke="currentColor" strokeWidth={2}>
-                <path d="M12 3C7 3 3 7 3 12s4 9 9 9c2 0 4-.7 5.5-1.9" strokeLinecap="round"/>
-                <path d="M17 8c1.5 1 2.5 2.5 2.5 4.5" strokeLinecap="round"/>
-                <circle cx="18" cy="6" r="1.5" fill="currentColor" stroke="none"/>
-              </svg>
-            </div>
+            <img
+              src={dark ? '/logo2-white.png' : '/logo2-abismo.png'}
+              alt="Vipper"
+              className="h-11 w-11 object-contain shrink-0"
+            />
             <div className="text-left">
               <p className="font-bold text-lg leading-none" style={{ color: 'var(--text-primary)' }}>Vipper</p>
               <p className="text-viper-400 text-xs font-mono tracking-widest uppercase">Ping</p>

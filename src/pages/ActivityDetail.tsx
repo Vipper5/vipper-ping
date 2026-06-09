@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode, type ChangeEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -16,6 +16,12 @@ import {
   Sun,
   CalendarRange,
   Flag,
+  StickyNote,
+  FileText,
+  ExternalLink,
+  Upload,
+  ImageIcon,
+  User,
 } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
@@ -32,12 +38,18 @@ import { progressColor, progressState } from '../lib/progress';
 import {
   setTaskComplete,
   setTaskStatus,
+  setTaskNote,
   updateTask,
   toggleSubtask as apiToggleSubtask,
   addSubtask as apiAddSubtask,
   updateSubtask as apiUpdateSubtask,
   deleteSubtask as apiDeleteSubtask,
   deleteTask as apiDeleteTask,
+  addProjectNote,
+  deleteProjectNote,
+  addProjectDoc,
+  deleteProjectDoc,
+  uploadProjectFile,
 } from '../lib/api';
 import { User as TeamUser, TaskPriority, Subtask } from '../mocks/data';
 
@@ -53,13 +65,13 @@ function formatDateTime(d: string) {
 // Cor de acento por status — dá identidade visual à página de task (diferente do cliente).
 const STATUS_COLOR: Record<string, string> = {
   pendente: '#94908a',
-  em_andamento: '#5294E6',
-  concluida: '#15BB77',
+  em_andamento: '#1D4ED8',
+  concluida: '#047857',
 };
 const PRIORITY_COLOR: Record<string, string> = {
-  alta: '#E54056',
-  media: '#F5AE39',
-  baixa: '#15BB77',
+  alta: '#B91C1C',
+  media: '#B45309',
+  baixa: '#047857',
 };
 
 interface EditTaskForm {
@@ -99,7 +111,7 @@ export function ActivityDetail() {
   const navigate = useNavigate();
   const toast = useToast();
   const { data: task, loading, reload } = useTask(id);
-  const { data: projects } = useProjects();
+  const { data: projects, reload: reloadProject } = useProjects();
   const { data: users } = useUsers();
   const { data: allTasks } = useTasks();
 
@@ -117,6 +129,24 @@ export function ActivityDetail() {
   const [openSub, setOpenSub] = useState<Subtask | null>(null);
   const [subEditing, setSubEditing] = useState(false);
   const [subEditForm, setSubEditForm] = useState<SubForm>({ title: '', description: '' });
+
+  // Anotação inline.
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
+  // Notas do projeto (modal).
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [projNoteText, setProjNoteText] = useState('');
+  const [projNoteImage, setProjNoteImage] = useState<File | null>(null);
+  const [projNoteImagePreview, setProjNoteImagePreview] = useState<string | null>(null);
+  const projNoteImageRef = useRef<HTMLInputElement | null>(null);
+
+  // Documentos do projeto (modal).
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docTitle, setDocTitle] = useState('');
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const docFileRef = useRef<HTMLInputElement | null>(null);
 
   if (loading) {
     return (
@@ -174,7 +204,9 @@ export function ActivityDetail() {
   // ---- handlers ----
   const toggleComplete = async () => {
     if (!canEdit) return;
-    await setTaskComplete(task.id, task.status !== 'concluida');
+    const completing = task.status !== 'concluida';
+    await setTaskComplete(task.id, completing);
+    if (completing) toast.success('🏆 Task Concluída!');
     reload();
   };
 
@@ -282,6 +314,90 @@ export function ActivityDetail() {
     }
   };
 
+  const startEditNote = () => {
+    setNoteText(task.note ?? '');
+    setEditingNote(true);
+  };
+  const cancelEditNote = () => setEditingNote(false);
+  const saveNote = async () => {
+    if (savingNote) return;
+    setSavingNote(true);
+    try {
+      await setTaskNote(task.id, noteText.trim() || null);
+      setEditingNote(false);
+      reload();
+    } catch {
+      toast.error('Não foi possível salvar a anotação.');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const closeNoteModal = () => {
+    setShowNoteModal(false);
+    setProjNoteImage(null);
+    setProjNoteImagePreview(null);
+    setProjNoteText('');
+  };
+  const handleNoteImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setProjNoteImage(file);
+    if (file) setProjNoteImagePreview(URL.createObjectURL(file));
+    else setProjNoteImagePreview(null);
+  };
+  const addNote = async () => {
+    if (!projNoteText.trim() || !user || !task.projectId || saving) return;
+    setSaving(true);
+    try {
+      let imageUrl: string | undefined;
+      if (projNoteImage) imageUrl = await uploadProjectFile(`notes/${task.projectId}`, projNoteImage);
+      await addProjectNote(task.projectId, projNoteText.trim(), user.id, imageUrl);
+      closeNoteModal();
+      reloadProject();
+    } catch (e) {
+      toast.error(`Não foi possível salvar a nota: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const removeNote = async (noteId: string) => {
+    try {
+      await deleteProjectNote(noteId);
+      reloadProject();
+    } catch {
+      toast.error('Não foi possível excluir a nota.');
+    }
+  };
+
+  const closeDocModal = () => {
+    setShowDocModal(false);
+    setDocFile(null);
+    setDocTitle('');
+  };
+  const addDoc = async () => {
+    if (!docTitle.trim() || !docFile || !task.projectId || saving) return;
+    setSaving(true);
+    try {
+      const url = await uploadProjectFile(`docs/${task.projectId}`, docFile);
+      await addProjectDoc(task.projectId, docTitle.trim(), url);
+      closeDocModal();
+      reloadProject();
+      toast.success('Documento adicionado.');
+    } catch (e) {
+      toast.error(`Não foi possível fazer upload: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const removeDoc = async (docId: string) => {
+    try {
+      await deleteProjectDoc(docId);
+      reloadProject();
+    } catch {
+      toast.error('Não foi possível excluir o documento.');
+    }
+  };
+
   // Cabeçalho de seção reutilizável com ícone colorido (identidade de "task").
   const SectionTitle = ({ icon, label, count }: { icon: ReactNode; label: string; count?: string }) => (
     <div className="flex items-center gap-2">
@@ -304,8 +420,8 @@ export function ActivityDetail() {
               <button
                 onClick={toggleComplete}
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border bg-transparent transition-all duration-150 hover:text-white"
-                style={{ borderColor: '#15BB77', color: '#15BB77' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#15BB77'; }}
+                style={{ borderColor: '#047857', color: '#047857' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#047857'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <RotateCcw size={14} /> <span className="hidden sm:inline">Reverter</span>
@@ -313,16 +429,16 @@ export function ActivityDetail() {
             ) : task.status === 'em_andamento' ? (
               <button
                 onClick={toggleComplete}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(21,187,119,0.55)]"
-                style={{ backgroundColor: '#15BB77' }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(4,120,87,0.55)]"
+                style={{ backgroundColor: '#047857' }}
               >
                 <CheckCircle2 size={14} /> <span className="hidden sm:inline">Concluir</span>
               </button>
             ) : (
               <button
                 onClick={startProgress}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(82,148,230,0.55)]"
-                style={{ backgroundColor: '#5294E6' }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md text-white transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_16px_rgba(29,78,216,0.55)]"
+                style={{ backgroundColor: '#1D4ED8' }}
               >
                 <Circle size={14} /> <span className="hidden sm:inline">Em andamento</span>
               </button>
@@ -331,7 +447,7 @@ export function ActivityDetail() {
           {isSocio && (
             <button
               onClick={openEditTask}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(134,55,204,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-viper-500"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(109,40,217,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-viper-500"
             >
               <Pencil size={14} /> <span className="hidden sm:inline">Editar</span>
             </button>
@@ -339,7 +455,7 @@ export function ActivityDetail() {
           {isSocio && (
             <button
               onClick={() => setShowDelete(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-danger text-danger bg-transparent transition-all duration-150 hover:bg-danger hover:text-white hover:shadow-[0_0_16px_rgba(229,64,86,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-danger text-danger bg-transparent transition-all duration-150 hover:bg-danger hover:text-white hover:shadow-[0_0_16px_rgba(185,28,28,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
             >
               <Trash2 size={14} /> <span className="hidden sm:inline">Excluir</span>
             </button>
@@ -442,7 +558,7 @@ export function ActivityDetail() {
             {task.description ? (
               <p className="text-sm text-base-secondary leading-relaxed whitespace-pre-wrap">{task.description}</p>
             ) : (
-              <p className="text-xs text-base-muted">Sem descrição.{isSocio && ' Use “Editar” para adicionar.'}</p>
+              <p className="text-xs text-base-muted">Sem descrição.{isSocio && ' Use "Editar" para adicionar.'}</p>
             )}
           </div>
         </div>
@@ -520,10 +636,141 @@ export function ActivityDetail() {
                 </div>
               ))}
               {totalSub === 0 && (
-                <p className="text-xs text-base-muted py-1">Nenhuma etapa.{isSocio && ' Adicione com “Nova etapa”.'}</p>
+                <p className="text-xs text-base-muted py-1">Nenhuma etapa.{isSocio && ' Adicione com "Nova etapa".'}</p>
               )}
             </div>
           </div>
+        )}
+
+        {/* ANOTAÇÃO */}
+        <div className="card rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <SectionTitle icon={<StickyNote size={13} />} label="Anotação" />
+            {!editingNote && canEdit && (
+              <button
+                onClick={startEditNote}
+                className="p-1 rounded text-base-muted hover:text-viper-500 transition-colors"
+                title="Editar anotação"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
+
+          {editingNote ? (
+            <div className="space-y-2">
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                rows={4}
+                placeholder="Adicione uma anotação sobre esta task..."
+                className="w-full px-3 py-2 rounded-md border text-sm resize-none focus:outline-none focus:border-viper-500 transition-colors"
+                style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button onClick={cancelEditNote} className="px-3 py-1.5 text-xs rounded-md text-base-muted hover:text-base-primary transition-colors">Cancelar</button>
+                <button
+                  onClick={saveNote}
+                  disabled={savingNote}
+                  className="px-3 py-1.5 text-xs rounded-md text-white font-medium transition-colors"
+                  style={{ backgroundColor: '#047857' }}
+                >
+                  {savingNote ? 'Salvando…' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          ) : task.note ? (
+            <p className="text-sm text-base-secondary leading-relaxed whitespace-pre-wrap">{task.note}</p>
+          ) : (
+            <p className="text-xs text-base-muted">
+              Sem anotação.{canEdit && (
+                <button onClick={startEditNote} className="ml-1 text-viper-500 hover:text-viper-400 transition-colors">Adicionar.</button>
+              )}
+            </p>
+          )}
+        </div>
+
+        {/* DOCUMENTAÇÃO + NOTAS do cliente — apenas para tasks de projeto */}
+        {isWeekly && project && (
+          <>
+            {/* Documentação */}
+            <div className="card rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <SectionTitle icon={<FileText size={13} />} label="Documentação" />
+                {isSocio && (
+                  <Button variant="tertiary" size="sm" onClick={() => setShowDocModal(true)}>
+                    <Plus size={13} /> Doc
+                  </Button>
+                )}
+              </div>
+              {project.docs.length === 0 ? (
+                <p className="text-xs text-base-muted">Nenhum documento.</p>
+              ) : (
+                <div className="space-y-2">
+                  {project.docs.map((doc) => (
+                    <div key={doc.id} className="group flex items-center gap-3 p-2.5 rounded-md" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                      <FileText size={15} className="text-viper-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-base-primary truncate">{doc.title}</p>
+                      </div>
+                      <a href={doc.url} target="_blank" rel="noreferrer" className="text-viper-400 hover:text-viper-500 transition-colors">
+                        <ExternalLink size={14} />
+                      </a>
+                      {isSocio && (
+                        <button
+                          onClick={() => removeDoc(doc.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-base-muted hover:text-danger hover:bg-danger/10"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Notas */}
+            <div className="card rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <SectionTitle icon={<StickyNote size={13} />} label="Notas do projeto" />
+                <Button variant="tertiary" size="sm" onClick={() => setShowNoteModal(true)}>
+                  <Plus size={13} /> Nota
+                </Button>
+              </div>
+              {project.notes.length === 0 ? (
+                <p className="text-xs text-base-muted">Nenhuma nota ainda.</p>
+              ) : (
+                <div className="space-y-3">
+                  {project.notes.map((note) => (
+                    <div key={note.id} className="group p-3 rounded-md border-l-2 border-viper-300" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                      <p className="text-sm text-base-secondary whitespace-pre-wrap">{note.text}</p>
+                      {note.imageUrl && (
+                        <a href={note.imageUrl} target="_blank" rel="noreferrer" className="mt-2 block rounded-md overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+                          <img src={note.imageUrl} alt="Imagem da nota" className="w-full max-h-48 object-cover hover:opacity-90 transition-opacity" />
+                        </a>
+                      )}
+                      <div className="flex items-center justify-between gap-2 mt-1.5">
+                        <span className="flex items-center gap-1.5 text-xs text-base-muted font-mono">
+                          <User size={10} />
+                          {users.find((u) => u.id === note.author)?.name ?? note.author}
+                        </span>
+                        {isSocio && (
+                          <button
+                            onClick={() => removeNote(note.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-base-muted hover:text-danger hover:bg-danger/10"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -689,6 +936,80 @@ export function ActivityDetail() {
           Tem certeza que deseja excluir <span className="font-semibold text-base-primary">{task.title}</span>?
           Todas as etapas serão removidas.
         </p>
+      </Modal>
+
+      {/* Modal: nota do projeto */}
+      <Modal
+        open={showNoteModal}
+        onClose={closeNoteModal}
+        title="Adicionar nota"
+        size="sm"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={closeNoteModal}>Cancelar</Button>
+            <Button variant="primary" onClick={addNote} disabled={!projNoteText.trim() || saving}>
+              {saving ? 'Salvando…' : 'Salvar nota'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Textarea value={projNoteText} onChange={(e) => setProjNoteText(e.target.value)} rows={4} placeholder="Escreva sua nota..." autoFocus />
+          <div>
+            <input ref={projNoteImageRef} type="file" accept="image/*,.gif" className="hidden" onChange={handleNoteImageChange} />
+            {projNoteImagePreview ? (
+              <div className="relative rounded-md overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+                <img src={projNoteImagePreview} alt="Preview" className="w-full max-h-48 object-cover" />
+                <button
+                  onClick={() => { setProjNoteImage(null); setProjNoteImagePreview(null); if (projNoteImageRef.current) projNoteImageRef.current.value = ''; }}
+                  className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => projNoteImageRef.current?.click()} className="flex items-center gap-2 text-xs text-base-muted hover:text-viper-500 transition-colors py-1.5 px-2 rounded-md hover:bg-subtle">
+                <ImageIcon size={14} /> Anexar imagem / gif (opcional)
+              </button>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: documento do projeto */}
+      <Modal
+        open={showDocModal}
+        onClose={closeDocModal}
+        title="Adicionar documento"
+        size="sm"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={closeDocModal}>Cancelar</Button>
+            <Button variant="primary" onClick={addDoc} disabled={!docTitle.trim() || !docFile || saving}>
+              {saving ? 'Enviando…' : 'Adicionar'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Título" required>
+            <Input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Ex.: Especificação da API" autoFocus />
+          </FormField>
+          <FormField label="Arquivo" required>
+            <input ref={docFileRef} type="file" className="hidden" onChange={(e) => setDocFile(e.target.files?.[0] ?? null)} />
+            {docFile ? (
+              <div className="flex items-center gap-2 p-2.5 rounded-md" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                <FileText size={15} className="text-viper-400 shrink-0" />
+                <span className="text-sm text-base-primary truncate flex-1">{docFile.name}</span>
+                <button onClick={() => { setDocFile(null); if (docFileRef.current) docFileRef.current.value = ''; }} className="text-base-muted hover:text-danger transition-colors text-xs">remover</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => docFileRef.current?.click()} className="w-full flex items-center justify-center gap-2 p-4 rounded-md border-2 border-dashed text-sm text-base-muted hover:text-viper-500 hover:border-viper-400 transition-colors" style={{ borderColor: 'var(--border)' }}>
+                <Upload size={16} /> Clique para selecionar o arquivo
+              </button>
+            )}
+          </FormField>
+        </div>
       </Modal>
     </Layout>
   );

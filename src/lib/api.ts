@@ -95,7 +95,7 @@ function mapProject(row: any): Project {
     responsibles: (row.project_responsibles ?? []).map((r: any) => r.profile_id),
     description: row.description ?? '',
     docs: (row.project_docs ?? [])
-      .map((d: any) => ({ title: d.title, url: d.url, addedAt: d.added_at }))
+      .map((d: any) => ({ id: d.id, title: d.title, url: d.url, addedAt: d.added_at }))
       .sort((a: any, b: any) => a.addedAt.localeCompare(b.addedAt)),
     notes: (row.project_notes ?? [])
       .map((n: any) => ({ id: n.id, text: n.text, author: n.author_id ?? '', createdAt: n.created_at, imageUrl: n.image_url ?? undefined }))
@@ -216,6 +216,16 @@ export async function addProjectDoc(projectId: string, title: string, url: strin
   const { error } = await supabase
     .from('project_docs')
     .insert({ project_id: projectId, title, url });
+  if (error) throw error;
+}
+
+export async function deleteProjectNote(noteId: string): Promise<void> {
+  const { error } = await supabase.from('project_notes').delete().eq('id', noteId);
+  if (error) throw error;
+}
+
+export async function deleteProjectDoc(docId: string): Promise<void> {
+  const { error } = await supabase.from('project_docs').delete().eq('id', docId);
   if (error) throw error;
 }
 
@@ -438,6 +448,14 @@ export async function setTaskStatus(taskId: string, status: TaskStatus): Promise
       status,
       completed_at: status === 'concluida' ? new Date().toISOString() : null,
     })
+    .eq('id', taskId);
+  if (error) throw error;
+}
+
+export async function setTaskNote(taskId: string, note: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ note: note || null })
     .eq('id', taskId);
   if (error) throw error;
 }

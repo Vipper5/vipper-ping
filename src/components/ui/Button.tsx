@@ -11,9 +11,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 // glow no hover, sempre na cor do próprio botão
 const GLOW = {
-  viper: 'hover:shadow-[0_0_16px_rgba(134,55,204,0.45)]',
-  viperSoft: 'hover:shadow-[0_0_14px_rgba(134,55,204,0.28)]',
-  danger: 'hover:shadow-[0_0_16px_rgba(229,64,86,0.45)]',
+  viper: 'hover:shadow-[0_0_16px_rgba(109,40,217,0.45)]',
+  viperSoft: 'hover:shadow-[0_0_14px_rgba(109,40,217,0.28)]',
+  danger: 'hover:shadow-[0_0_16px_rgba(185,28,28,0.45)]',
   neon: 'hover:shadow-[0_0_16px_rgba(0,255,148,0.5)]',
 };
 

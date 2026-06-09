@@ -25,9 +25,9 @@ let nextId = 1;
 
 const kindStyles: Record<ToastKind, { border: string; text: string; glow: string; icon: React.ReactNode }> = {
   success: {
-    border: '#15BB77',
-    text: '#15BB77',
-    glow: '0 0 18px rgba(0,255,148,0.35)',
+    border: '#047857',
+    text: '#047857',
+    glow: '0 0 18px rgba(4,120,87,0.35)',
     icon: <CheckCircle2 size={16} />,
   },
   error: {

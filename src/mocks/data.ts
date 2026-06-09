@@ -38,7 +38,7 @@ export interface Project {
   endDate: string;
   responsibles: string[];
   description: string;
-  docs: { title: string; url: string; addedAt: string }[];
+  docs: { id: string; title: string; url: string; addedAt: string }[];
   notes: { id: string; text: string; author: string; createdAt: string; imageUrl?: string }[];
   // Objetivos do cliente — checklist de metas (ver project_objectives).
   objectives: ProjectObjective[];

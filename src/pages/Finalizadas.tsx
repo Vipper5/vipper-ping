@@ -15,8 +15,8 @@ function formatDone(d?: string) {
 }
 
 const PERIOD_META: Record<TaskPeriod, { label: string; icon: typeof Sun; color: string }> = {
-  diaria: { label: 'Task', icon: Sun, color: '#F5AE39' },
-  semanal: { label: 'Projeto', icon: CalendarRange, color: '#8637CC' },
+  diaria: { label: 'Task', icon: Sun, color: '#B45309' },
+  semanal: { label: 'Projeto', icon: CalendarRange, color: '#6D28D9' },
 };
 
 function DoneCard({ task, projectName, users }: { task: Task; projectName?: string; users: ReturnType<typeof useUsers>['data'] }) {
@@ -101,7 +101,7 @@ export function Finalizadas() {
                 className="px-3.5 py-1.5 rounded-md text-sm font-medium border transition-all duration-150"
                 style={
                   active
-                    ? { backgroundColor: '#8637CC', borderColor: '#8637CC', color: '#fff', boxShadow: '0 0 16px rgba(134,55,204,0.42)' }
+                    ? { backgroundColor: '#6D28D9', borderColor: '#6D28D9', color: '#fff', boxShadow: '0 0 16px rgba(109,40,217,0.38)' }
                     : { backgroundColor: 'transparent', borderColor: 'var(--border)', color: 'var(--text-muted)' }
                 }
               >

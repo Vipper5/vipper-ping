@@ -16,7 +16,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useProject, useTasks, useUsers } from '../lib/hooks';
 import {
-  addProjectNote, addProjectDoc, updateProject, createTask, deleteProject,
+  addProjectNote, addProjectDoc, deleteProjectNote, deleteProjectDoc,
+  updateProject, createTask, deleteTask, setTaskComplete, deleteProject,
   addProjectObjective, updateProjectObjective, toggleProjectObjective, deleteProjectObjective,
   reorderProjectObjectives, uploadProjectFile,
 } from '../lib/api';
@@ -361,6 +362,43 @@ export function ProjectDetail() {
     }
   };
 
+  const completeTask = async (taskId: string, isDone: boolean) => {
+    try {
+      await setTaskComplete(taskId, !isDone);
+      reloadTasks();
+      if (!isDone) toast.success('🏆 Task Concluída!');
+    } catch {
+      toast.error('Não foi possível atualizar a task.');
+    }
+  };
+
+  const removeNote = async (noteId: string) => {
+    try {
+      await deleteProjectNote(noteId);
+      reloadProject();
+    } catch {
+      toast.error('Não foi possível excluir a nota.');
+    }
+  };
+
+  const removeDoc = async (docId: string) => {
+    try {
+      await deleteProjectDoc(docId);
+      reloadProject();
+    } catch {
+      toast.error('Não foi possível excluir o documento.');
+    }
+  };
+
+  const removeTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId);
+      reloadTasks();
+    } catch {
+      toast.error('Não foi possível excluir a task.');
+    }
+  };
+
   const createStandaloneTask = async () => {
     if (!standaloneTaskForm.title.trim() || standaloneTaskForm.assignedTo.length === 0 || !user || !id || saving) return;
     setSaving(true);
@@ -693,13 +731,40 @@ export function ProjectDetail() {
                       {/* Tasks vinculadas */}
                       {dailies.length > 0 && (
                         <div className="mt-2 pl-7 space-y-0.5">
-                          {dailies.map((d) => (
-                            <Link key={d.id} to={`/atividades/${d.id}`} className="flex items-center gap-2.5 py-1 -mx-1 px-1 rounded-sm hover:bg-subtle transition-colors">
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${d.status === 'concluida' ? 'bg-success' : d.status === 'em_andamento' ? 'bg-info' : 'bg-neutral-400'}`} />
-                              <span className={`text-sm flex-1 truncate ${d.status === 'concluida' ? 'line-through text-base-muted' : 'text-base-secondary'}`}>{d.title}</span>
-                              <span className="text-xs text-base-muted font-num shrink-0">{formatDate(d.dueDate)}</span>
-                            </Link>
-                          ))}
+                          {dailies.map((d) => {
+                            const canComplete = isSocio || (d.assignedTo ?? []).includes(user?.id ?? '');
+                            const isDoneD = d.status === 'concluida';
+                            return (
+                              <div key={d.id} className="group flex items-center gap-2.5 py-1 -mx-1 px-1 rounded-sm hover:bg-subtle transition-colors">
+                                {/* Dot (idle) → Checkbox (hover) */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.preventDefault(); if (canComplete) completeTask(d.id, isDoneD); }}
+                                  disabled={!canComplete}
+                                  title={isDoneD ? 'Reverter' : 'Marcar como concluída'}
+                                  className="shrink-0 w-4 h-4 flex items-center justify-center disabled:cursor-default"
+                                >
+                                  <span className={`block group-hover:hidden w-2 h-2 rounded-full ${isDoneD ? 'bg-success' : d.status === 'em_andamento' ? 'bg-info' : 'bg-neutral-400'}`} />
+                                  <span className={`hidden group-hover:flex w-4 h-4 rounded items-center justify-center border transition-all ${isDoneD ? 'bg-emerald-700 border-emerald-700' : 'border-neutral-400 hover:border-emerald-600'}`}>
+                                    {isDoneD && <Check size={10} strokeWidth={3} className="text-white animate-check-pop" />}
+                                  </span>
+                                </button>
+                                <Link to={`/atividades/${d.id}`} className="flex-1 flex items-center gap-2 min-w-0">
+                                  <span className={`text-sm flex-1 truncate ${isDoneD ? 'line-through text-base-muted' : 'text-base-secondary'}`}>{d.title}</span>
+                                </Link>
+                                <span className="text-xs text-base-muted font-num shrink-0">{formatDate(d.dueDate)}</span>
+                                {isSocio && (
+                                  <button
+                                    onClick={() => removeTask(d.id)}
+                                    title="Excluir task"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-base-muted hover:text-danger hover:bg-danger/10"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -758,16 +823,25 @@ export function ProjectDetail() {
               <p className="text-xs text-base-muted">Nenhum documento.</p>
             ) : (
               <div className="space-y-2">
-                {project.docs.map((doc, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-sm" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                {project.docs.map((doc) => (
+                  <div key={doc.id} className="group flex items-center gap-3 p-2.5 rounded-sm" style={{ backgroundColor: 'var(--bg-subtle)' }}>
                     <FileText size={15} className="text-viper-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-base-primary truncate">{doc.title}</p>
                       <p className="text-xs text-base-muted font-mono">{formatDateTime(doc.addedAt)}</p>
                     </div>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-viper-400 hover:text-viper-400 transition-colors">
+                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-viper-400 hover:text-viper-500 transition-colors">
                       <ExternalLink size={14} />
                     </a>
+                    {isSocio && (
+                      <button
+                        onClick={() => removeDoc(doc.id)}
+                        title="Excluir documento"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-base-muted hover:text-danger hover:bg-danger/10"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -786,18 +860,29 @@ export function ProjectDetail() {
             ) : (
               <div className="space-y-3">
                 {project.notes.map((note) => (
-                  <div key={note.id} className="p-3 rounded-sm border-l-2 border-viper-300" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                  <div key={note.id} className="group p-3 rounded-sm border-l-2 border-viper-300" style={{ backgroundColor: 'var(--bg-subtle)' }}>
                     <p className="text-sm text-base-secondary whitespace-pre-wrap">{note.text}</p>
                     {note.imageUrl && (
                       <a href={note.imageUrl} target="_blank" rel="noreferrer" className="mt-2 block rounded-md overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
                         <img src={note.imageUrl} alt="Imagem da nota" className="w-full max-h-48 object-cover hover:opacity-90 transition-opacity" />
                       </a>
                     )}
-                    <div className="flex items-center gap-2 mt-1.5 text-xs text-base-muted font-mono">
-                      <User size={10} />
-                      <span>{getUserName(note.author)}</span>
-                      <span>·</span>
-                      <span>{formatDateTime(note.createdAt)}</span>
+                    <div className="flex items-center justify-between gap-2 mt-1.5">
+                      <div className="flex items-center gap-2 text-xs text-base-muted font-mono">
+                        <User size={10} />
+                        <span>{getUserName(note.author)}</span>
+                        <span>·</span>
+                        <span>{formatDateTime(note.createdAt)}</span>
+                      </div>
+                      {isSocio && (
+                        <button
+                          onClick={() => removeNote(note.id)}
+                          title="Excluir nota"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-base-muted hover:text-danger hover:bg-danger/10"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -6,6 +6,7 @@ import { Badge, StatusBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Loading } from '../components/ui/Loading';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { useUsers, useTasks, useProjects } from '../lib/hooks';
 import { taskPeriod } from '../lib/tasks';
 import { progressState } from '../lib/progress';
@@ -110,6 +111,7 @@ function DoneStat({
 export function MemberDetail() {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const { data: users, loading: usersLoading } = useUsers();
   const { data: tasks, reload } = useTasks();
   const { data: projects } = useProjects();
@@ -159,7 +161,9 @@ export function MemberDetail() {
   const toggleTaskStatus = async (taskId: string) => {
     const current = tasks.find((t) => t.id === taskId);
     if (!current) return;
-    await setTaskComplete(taskId, current.status !== 'concluida');
+    const completing = current.status !== 'concluida';
+    await setTaskComplete(taskId, completing);
+    if (completing) toast.success('🏆 Task Concluída!');
     reload();
   };
 

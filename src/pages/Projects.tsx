@@ -39,10 +39,10 @@ function daysUntil(d: string): number {
 
 // Cor de acento do card por status do cliente.
 const STATUS_ACCENT: Record<ProjectStatus, string> = {
-  Ativo: '#15BB77',
-  'Em Desenvolvimento': '#0891B2',
-  Pausado: '#F5AE39',
-  'Concluído': '#5294E6',
+  Ativo: '#047857',
+  'Em Desenvolvimento': '#1D4ED8',
+  Pausado: '#475569',
+  'Concluído': '#0F766E',
 };
 
 // Metadados do prazo: cor + rótulo (relativo quando urgente, data caso contrário).
@@ -50,9 +50,9 @@ function deadlineMeta(endDate: string, status: ProjectStatus): { color: string; 
   if (!endDate) return { color: 'var(--text-muted)', label: '—', urgent: false };
   if (status === 'Concluído') return { color: 'var(--text-muted)', label: 'Entregue', urgent: false };
   const days = daysUntil(endDate);
-  if (days < 0) return { color: '#E54056', label: `${Math.abs(days)}d em atraso`, urgent: true };
-  if (days === 0) return { color: '#E54056', label: 'Entrega hoje', urgent: true };
-  if (days <= 7) return { color: '#F5AE39', label: `Faltam ${days}d`, urgent: true };
+  if (days < 0) return { color: '#B91C1C', label: `${Math.abs(days)}d em atraso`, urgent: true };
+  if (days === 0) return { color: '#B91C1C', label: 'Entrega hoje', urgent: true };
+  if (days <= 7) return { color: '#B45309', label: `Faltam ${days}d`, urgent: true };
   return { color: 'var(--text-muted)', label: formatDate(endDate), urgent: false };
 }
 
@@ -214,11 +214,11 @@ export function Projects() {
 
   // Cor de cada filtro. `darkText` = texto escuro em light mode (garante contraste no fundo claro).
   const filterColors: Record<string, { base: string; light: string; glow: string; darkText: string }> = {
-    all:               { base: '#8637CC', light: '#AD7BEB', glow: '134,55,204', darkText: '#7B2FBE' },
-    Ativo:             { base: '#15BB77', light: '#2EE6A0', glow: '0,255,148',  darkText: '#0D7A50' },
-    'Em Desenvolvimento': { base: '#0891B2', light: '#22D3EE', glow: '8,145,178', darkText: '#0C6C87' },
-    Pausado:           { base: '#F5AE39', light: '#FFC766', glow: '245,174,57', darkText: '#8B5000' },
-    'Concluído':       { base: '#5294E6', light: '#7DB0F2', glow: '82,148,230', darkText: '#3060A8' },
+    all:                  { base: '#6D28D9', light: '#7C3AED', glow: '109,40,217',  darkText: '#5B21B6' },
+    Ativo:                { base: '#047857', light: '#059669', glow: '4,120,87',    darkText: '#065F46' },
+    'Em Desenvolvimento': { base: '#1D4ED8', light: '#2563EB', glow: '29,78,216',  darkText: '#1E40AF' },
+    Pausado:              { base: '#475569', light: '#64748B', glow: '71,85,105',   darkText: '#334155' },
+    'Concluído':          { base: '#0F766E', light: '#0D9488', glow: '15,118,110', darkText: '#115E59' },
   };
 
   return (

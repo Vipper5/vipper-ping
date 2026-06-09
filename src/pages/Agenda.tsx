@@ -9,8 +9,9 @@ import { TimePicker } from '../components/ui/TimePicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTasks, useEvents, useProjects, useUsers } from '../lib/hooks';
+import { useToast } from '../contexts/ToastContext';
 import { Avatar } from '../components/ui/Avatar';
-import { createTask, createEvent, updateTask, updateEvent, deleteEvent, deleteTask } from '../lib/api';
+import { createTask, createEvent, updateTask, updateEvent, deleteEvent, deleteTask, updateProject, addProjectNote } from '../lib/api';
 import { Task, AgendaEvent, TaskPriority } from '../mocks/data';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -57,7 +58,7 @@ interface CalItem {
 }
 
 interface NewForm {
-  type: 'tarefa' | 'entrega' | 'reuniao' | 'lembrete';
+  type: 'tarefa' | 'entrega' | 'reuniao' | 'lembrete' | 'conclusao';
   title: string;
   members: string[];
   priority: TaskPriority;
@@ -73,12 +74,21 @@ const emptyForm: NewForm = {
   description: '', note: '', location: '', link: '',
 };
 
+const CATEGORY_PRIORITY: Record<Category, number> = {
+  reuniao: 0,
+  lembrete: 1,
+  conclusao: 2,
+  entrega: 3,
+  tarefa: 4,
+};
+
 export function Agenda() {
   const { user } = useAuth();
   const { dark } = useTheme();
+  const toast = useToast();
   const { data: tasks, reload: reloadTasks } = useTasks();
   const { data: events, reload: reloadEvents } = useEvents();
-  const { data: projects } = useProjects();
+  const { data: projects, reload: reloadProjects } = useProjects();
   const { data: users } = useUsers();
   const [saving, setSaving] = useState(false);
   const [cursor, setCursor] = useState(() => {
@@ -122,9 +132,12 @@ export function Agenda() {
     items.push({ id: `proj-${p.id}`, title: `Conclusão: ${p.name}`, category: 'conclusao', color: CATEGORY.conclusao.color, date: p.endDate, to: `/projetos/${p.id}`, projectId: p.id });
   });
 
-  // agrupa por dia
+  // agrupa por dia e ordena por prioridade de categoria
   const byDay: Record<string, CalItem[]> = {};
   items.forEach((it) => { (byDay[it.date] = byDay[it.date] || []).push(it); });
+  Object.keys(byDay).forEach((day) => {
+    byDay[day].sort((a, b) => CATEGORY_PRIORITY[a.category] - CATEGORY_PRIORITY[b.category]);
+  });
 
   const firstCell = new Date(year, month, 1 - new Date(year, month, 1).getDay());
   const cells: Date[] = [];
@@ -235,7 +248,9 @@ export function Agenda() {
   const isTaskType = form.type === 'tarefa' || form.type === 'entrega';
 
   const saveEntry = async () => {
-    if (!form.title.trim() || form.members.length === 0 || !user || !selectedDay || saving) return;
+    if (!form.title.trim() || !user || !selectedDay || saving) return;
+    if (form.type !== 'conclusao' && form.members.length === 0) return;
+    if (form.type === 'conclusao' && !form.projectId) return;
     setSaving(true);
     try {
       if (isTaskType) {
@@ -263,6 +278,23 @@ export function Agenda() {
           });
         }
         reloadTasks();
+      } else if (form.type === 'conclusao') {
+        const proj = projects.find((p) => p.id === form.projectId);
+        if (!proj) return;
+        await updateProject(form.projectId, {
+          name: proj.name,
+          client: proj.client,
+          status: 'Concluído',
+          stack: proj.stack,
+          startDate: proj.startDate,
+          endDate: selectedDay,
+          description: proj.description,
+          responsibles: proj.responsibles,
+        });
+        const noteText = [form.title.trim(), form.description.trim()].filter(Boolean).join('\n\n');
+        if (noteText) await addProjectNote(form.projectId, noteText, user.id);
+        toast.success(`✅ ${proj.name} marcado como concluído!`);
+        reloadProjects();
       } else {
         const payload = {
           title: form.title.trim(),
@@ -363,7 +395,7 @@ export function Agenda() {
               <button
                 key={i}
                 onClick={() => openDay(key)}
-                className="group relative text-left min-h-[68px] sm:min-h-[122px] py-1.5 pr-1 pl-2 sm:py-2 sm:pr-2 sm:pl-3 flex flex-col gap-1 border-b border-r transition-colors focus:outline-none"
+                className="group relative text-left min-h-[68px] sm:min-h-[148px] py-1.5 pr-1 pl-2 sm:py-2 sm:pr-2 sm:pl-3 flex flex-col gap-1 border-b border-r transition-colors focus:outline-none"
                 style={{ borderColor: 'var(--border)', backgroundColor: cellBg }}
               >
                 {/* borda lateral colorida com as cores do dia */}
@@ -399,20 +431,20 @@ export function Agenda() {
                 )}
 
                 {/* Tablet/desktop: chips de texto */}
-                <div className="relative hidden sm:flex flex-col gap-1 overflow-hidden">
+                <div className="relative hidden sm:flex flex-col gap-1.5 overflow-hidden">
                   {shown.map((it) => (
                     <div
                       key={it.id}
-                      className="flex items-center gap-1.5 pr-1.5 py-0.5 rounded-sm text-[11px] leading-tight overflow-hidden"
+                      className="flex items-center gap-2 pr-2 py-1 rounded text-[12px] leading-tight overflow-hidden"
                       style={{ backgroundColor: tint(it.color, 0.14) }}
                     >
-                      <span className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: it.color, minHeight: 14 }} />
-                      <span className={`truncate ${it.task?.status === 'concluida' ? 'line-through opacity-70' : ''}`} style={{ color: it.color }}>
+                      <span className="w-1.5 self-stretch rounded-full shrink-0" style={{ backgroundColor: it.color, minHeight: 16 }} />
+                      <span className={`truncate font-medium ${it.task?.status === 'concluida' ? 'line-through opacity-70' : ''}`} style={{ color: it.color }}>
                         {it.event?.time ? `${it.event.time} ` : ''}{it.category === 'conclusao' ? it.title.replace('Conclusão: ', '🏁 ') : it.title}
                       </span>
                     </div>
                   ))}
-                  {extra > 0 && <span className="text-[10px] font-mono text-base-muted pl-0.5">+{extra} mais</span>}
+                  {extra > 0 && <span className="text-[11px] font-mono text-base-muted pl-0.5">+{extra} mais</span>}
                 </div>
               </button>
             );
@@ -463,7 +495,7 @@ export function Agenda() {
                     <p className="text-sm text-base-muted text-center py-8">Nada agendado para este dia.</p>
                   ) : (
                     <div className="space-y-5">
-                      {(Object.keys(CATEGORY) as Category[])
+                      {(['reuniao', 'lembrete', 'conclusao', 'entrega', 'tarefa'] as Category[])
                         .map((cat) => ({ cat, items: dayItems.filter((it) => it.category === cat) }))
                         .filter(({ items }) => items.length > 0)
                         .map(({ cat, items }) => (
@@ -615,14 +647,14 @@ export function Agenda() {
                   {!editingId && (
                     <FormField label="Tipo">
                       <div className="grid grid-cols-2 gap-2">
-                        {(['tarefa', 'entrega', 'reuniao', 'lembrete'] as const).map((tp) => {
+                        {(['tarefa', 'entrega', 'reuniao', 'lembrete', 'conclusao'] as const).map((tp) => {
                           const sel = form.type === tp;
                           const color = CATEGORY[tp].color;
                           return (
                             <button
                               key={tp}
                               type="button"
-                              onClick={() => setForm((f) => ({ ...f, type: tp }))}
+                              onClick={() => setForm((f) => ({ ...f, type: tp, title: tp === 'conclusao' ? '' : f.title }))}
                               className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all"
                               style={sel ? { borderColor: color, backgroundColor: tint(color, 0.12), color } : { borderColor: 'var(--border)' }}
                             >
@@ -635,35 +667,62 @@ export function Agenda() {
                     </FormField>
                   )}
 
+                  {/* Para conclusão: cliente vem antes do título (auto-preenche) */}
+                  {form.type === 'conclusao' && (
+                    <FormField label="Cliente" required>
+                      <Select
+                        value={form.projectId}
+                        onChange={(e) => {
+                          const pid = e.target.value;
+                          const proj = projects.find((p) => p.id === pid);
+                          setForm((f) => ({ ...f, projectId: pid, title: proj?.name ?? '' }));
+                        }}
+                      >
+                        <option value="">Selecione o cliente...</option>
+                        {projects.filter((p) => p.status !== 'Concluído').map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </Select>
+                    </FormField>
+                  )}
+
                   <FormField label="Título" required>
                     <Input
                       value={form.title}
                       onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                      placeholder={form.type === 'reuniao' ? 'Assunto da reunião...' : form.type === 'lembrete' ? 'Lembrete...' : 'Título da task...'}
+                      placeholder={
+                        form.type === 'reuniao' ? 'Assunto da reunião...'
+                        : form.type === 'lembrete' ? 'Lembrete...'
+                        : form.type === 'conclusao' ? 'Título da conclusão...'
+                        : 'Título da task...'
+                      }
                       autoFocus
                     />
                   </FormField>
 
-                  <FormField label={isTaskType ? 'Responsáveis' : 'Participantes'} hint={isTaskType ? 'Até 2' : undefined}>
-                    <div className="flex gap-2 flex-wrap">
-                      {users.map((u) => {
-                        const sel = form.members.includes(u.id);
-                        const dis = isTaskType && !sel && form.members.length >= 2;
-                        return (
-                          <button
-                            key={u.id}
-                            type="button"
-                            disabled={dis}
-                            onClick={() => toggleMember(u.id)}
-                            className={`chip flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs ${sel ? 'chip-selected' : ''}`}
-                          >
-                            <Avatar user={u} size={20} fontSize={9} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
-                            {u.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FormField>
+                  {/* Membros — apenas para não-conclusao */}
+                  {form.type !== 'conclusao' && (
+                    <FormField label={isTaskType ? 'Responsáveis' : 'Participantes'} hint={isTaskType ? 'Até 2' : undefined}>
+                      <div className="flex gap-2 flex-wrap">
+                        {users.map((u) => {
+                          const sel = form.members.includes(u.id);
+                          const dis = isTaskType && !sel && form.members.length >= 2;
+                          return (
+                            <button
+                              key={u.id}
+                              type="button"
+                              disabled={dis}
+                              onClick={() => toggleMember(u.id)}
+                              className={`chip flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs ${sel ? 'chip-selected' : ''}`}
+                            >
+                              <Avatar user={u} size={20} fontSize={9} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
+                              {u.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FormField>
+                  )}
 
                   {isTaskType && (
                     <>
@@ -716,10 +775,31 @@ export function Agenda() {
                     </>
                   )}
 
+                  {form.type === 'conclusao' && (
+                    <FormField label="Descrição" hint="Opcional">
+                      <Textarea
+                        value={form.description}
+                        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                        rows={3}
+                        placeholder="Observações sobre a conclusão do cliente..."
+                      />
+                    </FormField>
+                  )}
+
                   <div className="flex items-center gap-2 pt-2">
                     <Button variant="tertiary" onClick={goList} className="flex-1">Cancelar</Button>
-                    <Button variant="primary" onClick={saveEntry} disabled={!form.title.trim() || form.members.length === 0 || saving} className="flex-1">
-                      {saving ? 'Salvando…' : editingId ? 'Salvar' : 'Adicionar'}
+                    <Button
+                      variant="primary"
+                      onClick={saveEntry}
+                      disabled={
+                        !form.title.trim() ||
+                        (form.type !== 'conclusao' && form.members.length === 0) ||
+                        (form.type === 'conclusao' && !form.projectId) ||
+                        saving
+                      }
+                      className="flex-1"
+                    >
+                      {saving ? 'Salvando…' : form.type === 'conclusao' ? 'Marcar conclusão' : editingId ? 'Salvar' : 'Adicionar'}
                     </Button>
                   </div>
                 </div>

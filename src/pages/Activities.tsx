@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ListChecks, CalendarRange, Sun, CalendarClock, Flag, Plus } from 'lucide-react';
+import { CheckCircle2, ListChecks, CalendarRange, Sun, CalendarClock, Flag, Plus, EyeOff, Eye } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { StatusBadge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -50,15 +50,15 @@ function taskPeriod(t: Task): TaskPeriod {
 
 // Metadados visuais de cada nível (ícone + cor + rótulos singular/plural).
 const PERIOD_META: Record<TaskPeriod, { label: string; plural: string; icon: typeof Sun; color: string }> = {
-  diaria: { label: 'Task', plural: 'Tasks', icon: Sun, color: '#F5AE39' },
-  semanal: { label: 'Projeto', plural: 'Projetos', icon: CalendarRange, color: '#8637CC' },
+  diaria: { label: 'Task', plural: 'Tasks', icon: Sun, color: '#B45309' },
+  semanal: { label: 'Projeto', plural: 'Projetos', icon: CalendarRange, color: '#6D28D9' },
 };
 
 // Cor por prioridade (acento lateral do card).
 const PRIORITY_META: Record<string, { label: string; color: string }> = {
-  alta: { label: 'Alta', color: '#E54056' },
-  media: { label: 'Média', color: '#F5AE39' },
-  baixa: { label: 'Baixa', color: '#15BB77' },
+  alta: { label: 'Alta', color: '#B91C1C' },
+  media: { label: 'Média', color: '#B45309' },
+  baixa: { label: 'Baixa', color: '#047857' },
 };
 
 function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[]; projects: Project[]; users: User[] }) {
@@ -81,7 +81,7 @@ function TaskCard({ task, tasks, projects, users }: { task: Task; tasks: Task[];
   return (
     <Link
       to={`/atividades/${task.id}`}
-      className={`group relative card-interactive rounded-lg overflow-hidden flex flex-col ${isWeekly ? 'gap-3 p-5 pl-6' : 'gap-2.5 p-4 pl-5'} ${isDone ? 'opacity-70' : ''}`}
+      className={`group relative card-interactive rounded-lg overflow-hidden flex flex-col ${isWeekly ? 'gap-3 p-5 pl-6' : 'gap-2.5 p-4 pl-5'} ${isDone ? 'opacity-35 grayscale-[40%]' : ''}`}
     >
       {/* Acento lateral por prioridade */}
       <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: prio.color }} />
@@ -212,6 +212,16 @@ export function Activities() {
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
   const [saving, setSaving] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(() =>
+    localStorage.getItem('ping:hideCompleted') === 'true',
+  );
+  const toggleHideCompleted = () => {
+    setHideCompleted((h) => {
+      const next = !h;
+      localStorage.setItem('ping:hideCompleted', String(next));
+      return next;
+    });
+  };
 
   const { dark } = useTheme();
   const isSocio = user?.role === 'socio';
@@ -287,6 +297,7 @@ export function Activities() {
 
   const filtered = assigneeFiltered
     .filter((t) => filterStatus === 'all' || t.status === filterStatus)
+    .filter((t) => !hideCompleted || t.status !== 'concluida')
     .sort((a, b) => {
       const r = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
       if (r !== 0) return r;
@@ -302,10 +313,10 @@ export function Activities() {
     { key: 'concluida', label: 'Concluída' },
   ];
   const filterColors: Record<string, { base: string; light: string; glow: string; darkText: string }> = {
-    all:         { base: '#8637CC', light: '#AD7BEB', glow: '134,55,204', darkText: '#7B2FBE' },
-    pendente:    { base: '#E54056', light: '#FF6B7E', glow: '229,64,86',  darkText: '#CC2033' },
-    em_andamento:{ base: '#F5AE39', light: '#FFC766', glow: '245,174,57', darkText: '#8B5000' },
-    concluida:   { base: '#15BB77', light: '#2EE6A0', glow: '0,255,148',  darkText: '#0D7A50' },
+    all:         { base: '#6D28D9', light: '#7C3AED', glow: '109,40,217',  darkText: '#5B21B6' },
+    pendente:    { base: '#B91C1C', light: '#DC2626', glow: '185,28,28',   darkText: '#991B1B' },
+    em_andamento:{ base: '#B45309', light: '#D97706', glow: '180,83,9',    darkText: '#92400E' },
+    concluida:   { base: '#047857', light: '#059669', glow: '4,120,87',    darkText: '#065F46' },
   };
 
   // Projetos primeiro, Tasks em segundo.
@@ -405,11 +416,25 @@ export function Activities() {
           })}
         </div>
 
+        <button
+          onClick={toggleHideCompleted}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all duration-150"
+          style={
+            hideCompleted
+              ? { borderColor: '#047857', backgroundColor: 'rgba(4,120,87,0.1)', color: '#047857' }
+              : { borderColor: 'var(--border)', color: 'var(--text-muted)' }
+          }
+          title={hideCompleted ? 'Mostrar concluídas' : 'Ocultar concluídas'}
+        >
+          {hideCompleted ? <Eye size={13} /> : <EyeOff size={13} />}
+          {hideCompleted ? `Mostrar concluídas (${counts.concluida})` : 'Ocultar concluídas'}
+        </button>
+
         {isSocio && (
           <select
             value={filterAssignee}
             onChange={(e) => setFilterAssignee(e.target.value)}
-            className="ml-auto text-xs px-3 py-1.5 rounded-md border focus:outline-none focus:ring-1 focus:ring-viper-500"
+            className="text-xs px-3 py-1.5 rounded-md border focus:outline-none focus:ring-1 focus:ring-viper-500"
             style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
           >
             <option value="mine">Minhas tasks</option>
