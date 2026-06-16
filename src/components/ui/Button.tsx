@@ -1,6 +1,6 @@
 import React from 'react';
 
-type Variant = 'primary' | 'secondary' | 'tertiary' | 'destructive' | 'neon';
+type Variant = 'primary' | 'secondary' | 'tertiary' | 'destructive' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -9,31 +9,46 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
 }
 
-// glow no hover, sempre na cor do próprio botão
-const GLOW = {
-  viper: 'hover:shadow-[0_0_16px_rgba(109,40,217,0.45)]',
-  viperSoft: 'hover:shadow-[0_0_14px_rgba(109,40,217,0.28)]',
-  danger: 'hover:shadow-[0_0_16px_rgba(185,28,28,0.45)]',
-  neon: 'hover:shadow-[0_0_16px_rgba(0,255,148,0.5)]',
+const variantStyles: Record<Variant, React.CSSProperties> = {
+  primary: {
+    background: '#4A11A2',
+    color: '#FFFFFF',
+    border: 'none',
+  },
+  secondary: {
+    background: 'transparent',
+    color: '#4A11A2',
+    border: '0.5px solid #4A11A2',
+  },
+  tertiary: {
+    background: 'transparent',
+    color: '#4A11A2',
+    border: 'none',
+  },
+  destructive: {
+    background: '#EF4444',
+    color: '#FFFFFF',
+    border: 'none',
+  },
+  ghost: {
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    border: '0.5px solid var(--border)',
+  },
 };
 
-const variantClasses: Record<Variant, string> = {
-  primary:
-    `bg-viper-500 text-white hover:bg-viper-600 active:bg-viper-700 ${GLOW.viper} disabled:bg-viper-200 disabled:text-viper-400 disabled:shadow-none dark:disabled:bg-carvao-surface2 dark:disabled:text-viper-800`,
-  secondary:
-    `border border-viper-500 text-viper-500 bg-transparent hover:bg-viper-50 active:bg-viper-100 ${GLOW.viperSoft} disabled:border-neutral-300 disabled:text-neutral-400 disabled:shadow-none dark:hover:bg-carvao-surface2 dark:disabled:border-carvao-surface3 dark:disabled:text-neutral-600`,
-  tertiary:
-    `text-viper-500 bg-transparent hover:bg-viper-50 hover:text-viper-400 active:bg-viper-100 disabled:text-neutral-400 disabled:shadow-none dark:hover:bg-carvao-surface2 dark:disabled:text-neutral-600`,
-  destructive:
-    `bg-danger text-white hover:bg-red-600 active:bg-red-700 ${GLOW.danger} disabled:bg-red-200 disabled:text-red-400 disabled:shadow-none`,
-  neon:
-    `bg-neon-500 text-carvao-base font-semibold hover:bg-neon-400 active:bg-neon-600 ${GLOW.neon} disabled:bg-neon-800 disabled:text-neon-600 disabled:shadow-none`,
+const variantHover: Record<Variant, string> = {
+  primary:     '#6B28C4',
+  secondary:   'rgba(74,17,162,0.08)',
+  tertiary:    'rgba(74,17,162,0.06)',
+  destructive: '#DC2626',
+  ghost:       'var(--bg-subtle)',
 };
 
-const sizeClasses: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm rounded-md',
-  md: 'px-4 py-2 text-sm rounded-md',
-  lg: 'px-6 py-3 text-base rounded-lg',
+const sizeStyles: Record<Size, React.CSSProperties> = {
+  sm: { padding: '7px 14px', fontSize: '11px', letterSpacing: '0.08em' },
+  md: { padding: '9px 18px', fontSize: '12px', letterSpacing: '0.08em' },
+  lg: { padding: '12px 24px', fontSize: '13px', letterSpacing: '0.06em' },
 };
 
 export function Button({
@@ -41,11 +56,46 @@ export function Button({
   size = 'md',
   className = '',
   children,
+  style,
   ...props
 }: ButtonProps) {
+  const [hover, setHover] = React.useState(false);
+
+  const baseStyle: React.CSSProperties = {
+    ...variantStyles[variant],
+    ...sizeStyles[size],
+    borderRadius: '0.375rem',
+    fontFamily: 'Oswald, sans-serif',
+    fontWeight: 500,
+    textTransform: 'uppercase',
+    cursor: props.disabled ? 'not-allowed' : 'pointer',
+    opacity: props.disabled ? 0.45 : 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+    outline: 'none',
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+    ...(hover && !props.disabled
+      ? variant === 'primary'
+        ? { background: variantHover[variant], boxShadow: '0 0 18px rgba(74,17,162,0.40)' }
+        : variant === 'secondary'
+        ? { background: variantHover[variant], boxShadow: '0 0 14px rgba(74,17,162,0.20)' }
+        : variant === 'destructive'
+        ? { background: variantHover[variant], boxShadow: '0 0 16px rgba(239,68,68,0.35)' }
+        : { background: variantHover[variant] }
+      : {}),
+    ...style,
+  };
+
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-viper-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed select-none ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={className}
+      style={baseStyle}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       {...props}
     >
       {children}

@@ -1,69 +1,81 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  FolderKanban,
-  CheckSquare,
-  CheckCheck,
-  CalendarDays,
-  BarChart2,
-  Clock,
-  LogOut,
-  Sun,
-  Moon,
-  Users,
-  ChevronRight,
-} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: React.ReactNode;
+  icon: string;
   socioOnly?: boolean;
   estagiarioOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { to: '/projetos', label: 'Clientes', icon: <FolderKanban size={18} /> },
-  { to: '/atividades', label: 'Tasks', icon: <CheckSquare size={18} /> },
-  { to: '/finalizadas', label: 'Finalizadas', icon: <CheckCheck size={18} /> },
-  { to: '/agenda', label: 'Agenda', icon: <CalendarDays size={18} /> },
-  { to: '/membros', label: 'Membros', icon: <Users size={18} /> },
-  { to: '/relatorios', label: 'Relatórios', icon: <BarChart2 size={18} />, socioOnly: true },
-  { to: '/ponto', label: 'Ponto', icon: <Clock size={18} />, estagiarioOnly: true },
+  { to: '/dashboard',   label: 'Dashboard',  icon: 'ph-squares-four' },
+  { to: '/projetos',    label: 'Clientes',   icon: 'ph-folder-notch' },
+  { to: '/atividades',  label: 'Tasks',       icon: 'ph-check-square' },
+  { to: '/finalizadas', label: 'Finalizadas', icon: 'ph-check-circle' },
+  { to: '/agenda',      label: 'Agenda',      icon: 'ph-calendar-blank' },
+  { to: '/membros',     label: 'Membros',     icon: 'ph-users' },
+  { to: '/relatorios',  label: 'Relatórios',  icon: 'ph-chart-bar', socioOnly: true },
+  { to: '/ponto',       label: 'Ponto',       icon: 'ph-clock', estagiarioOnly: true },
 ];
 
-function UserAvatar({ user }: { user: { name: string; initials: string; photo?: string | null } }) {
+function UserAvatar({ user, size = 32 }: {
+  user: { name: string; initials: string; photo?: string | null };
+  size?: number;
+}) {
   if (user.photo) {
     return (
       <img
         src={user.photo}
         alt={user.name}
-        className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-viper-700"
+        style={{
+          width: size, height: size, borderRadius: '50%',
+          objectFit: 'cover', flexShrink: 0,
+          border: '1.5px solid rgba(74,17,162,0.55)',
+        }}
       />
     );
   }
   return (
-    <div className="w-9 h-9 rounded-full bg-viper-700 flex items-center justify-center shrink-0 ring-2 ring-viper-800">
-      <span className="text-xs font-bold text-viper-200 font-mono">{user.initials}</span>
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+      background: 'rgba(74,17,162,0.22)',
+      border: '1.5px solid rgba(74,17,162,0.45)',
+      color: '#C9B6F0',
+      fontFamily: 'Oswald, sans-serif', fontWeight: 500,
+      fontSize: `${Math.round(size * 0.34)}px`, letterSpacing: '0.06em',
+    }}>
+      {user.initials}
     </div>
   );
 }
 
 interface SidebarProps {
-  /** No mobile, controla se o drawer está aberto. */
   open?: boolean;
-  /** Fecha o drawer (mobile). */
   onClose?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ open = false, onClose }: SidebarProps) {
+const ITEM_LABEL: React.CSSProperties = {
+  fontFamily: 'Oswald, sans-serif',
+  fontWeight: 500,
+  fontSize: '11.5px',
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+};
+
+export function Sidebar({ open = false, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   const { user, signOut } = useAuth();
   const { dark, toggle } = useTheme();
   const navigate = useNavigate();
+  const [logoutHover, setLogoutHover] = useState(false);
+  const [themeHover,  setThemeHover]  = useState(false);
 
   const handleLogout = async () => {
     await signOut();
@@ -78,86 +90,289 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     return true;
   });
 
+  const muted  = 'rgba(255,255,255,0.35)';
+  const bright = 'rgba(255,255,255,0.80)';
+  const divider = '0.5px solid rgba(255,255,255,0.06)';
+
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen w-64 md:w-52 lg:w-56 flex flex-col z-50 transition-transform duration-200 md:translate-x-0 ${
+      className={`fixed left-0 top-0 h-screen flex flex-col z-50 transition-all duration-300 md:translate-x-0 ${
         open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       }`}
-      style={{ backgroundColor: 'var(--sidebar-bg)' }}
+      style={{
+        width: collapsed ? '68px' : '220px',
+        background: `
+          radial-gradient(ellipse 140% 30% at 50% 0%, rgba(74,17,162,0.30) 0%, transparent 60%),
+          rgba(10, 10, 14, 0.84)
+        `,
+        backdropFilter: 'blur(28px)',
+        WebkitBackdropFilter: 'blur(28px)',
+        borderRight: '0.5px solid rgba(255,255,255,0.07)',
+      }}
     >
-      {/* Logo — height matches the page header so the bottom borders align */}
-      <div className="h-[73px] flex items-center gap-3 px-5 border-b shrink-0" style={{ borderColor: 'var(--sidebar-border)' }}>
-        <img src="/logo2-color.png" alt="Vipper" className="h-9 w-9 object-contain shrink-0" />
-        <div>
-          <div className="text-white font-bold text-sm leading-tight">Vipper</div>
-          <div className="text-viper-300 text-xs font-mono tracking-widest uppercase">Ping</div>
-        </div>
+
+      {/* ─── HEADER ─── */}
+      <div
+        className="h-[68px] flex items-center shrink-0"
+        style={{
+          borderBottom: divider,
+          padding: '0 10px 0 16px',
+          justifyContent: 'space-between',
+        }}
+      >
+        {collapsed ? (
+          /* Compacto: apenas o botão de expandir, centralizado */
+          <CollapseButton collapsed={collapsed} onToggle={onToggleCollapse} center />
+        ) : (
+          /* Expandido: logo à esquerda + botão à direita */
+          <>
+            <Link to="/dashboard" onClick={onClose} className="flex items-center gap-2.5 min-w-0">
+              <div className="vipper-logo shrink-0" style={{ width: 32, height: 32 }}>
+                <img src="/Vipper - ROXA.png" className="ghost" alt="" />
+                <img src="/Vipper - ROXA.png" className="base" alt="Vipper" />
+              </div>
+              <div className="leading-none">
+                <div style={{
+                  fontFamily: 'Oswald, sans-serif', fontWeight: 700,
+                  fontSize: '15px', letterSpacing: '0.18em',
+                  color: '#FFFFFF', textTransform: 'uppercase',
+                }}>VIPPER</div>
+                <div style={{
+                  fontFamily: 'JetBrains Mono, monospace', fontWeight: 400,
+                  fontSize: '8.5px', color: '#6B28C4',
+                  letterSpacing: '0.34em', marginTop: '2px',
+                }}>PING</div>
+              </div>
+            </Link>
+            <CollapseButton collapsed={collapsed} onToggle={onToggleCollapse} />
+          </>
+        )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+      {/* ─── NAV ─── */}
+      <nav className="flex-1 overflow-y-auto py-5 px-2" style={{ overflowX: 'hidden' }}>
         {visibleItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onClose}
-          >
+          <NavLink key={item.to} to={item.to} onClick={onClose}>
             {({ isActive }) => (
-              <div
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 ${
-                  isActive
-                    ? 'bg-viper-500/10 text-viper-400'
-                    : 'text-neutral-400 hover:text-white hover:bg-carvao-surface1'
-                }`}
-              >
-                {isActive && (
-                  <span className="absolute left-0 inset-y-1.5 w-[3px] rounded-r bg-viper-500" />
-                )}
-                <span className={isActive ? 'pl-1' : ''}>{item.icon}</span>
-                <span className={isActive ? 'font-medium' : ''}>{item.label}</span>
-              </div>
+              <SidebarItem
+                icon={item.icon}
+                label={item.label}
+                isActive={isActive}
+                collapsed={collapsed}
+                muted={muted}
+                bright={bright}
+              />
             )}
           </NavLink>
         ))}
       </nav>
 
-      {/* Bottom — theme + logout */}
-      <div className="px-3 pt-3 pb-2 border-t space-y-1" style={{ borderColor: 'var(--sidebar-border)' }}>
+      {/* ─── UTILS ─── */}
+      <div style={{ borderTop: divider, padding: '4px 8px' }}>
         <button
           onClick={toggle}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-neutral-400 hover:text-white hover:bg-carvao-surface1 text-sm transition-colors"
+          onMouseEnter={() => setThemeHover(true)}
+          onMouseLeave={() => setThemeHover(false)}
+          title={dark ? 'Modo Claro' : 'Modo Escuro'}
+          className="w-full flex items-center rounded-md transition-all duration-150"
+          style={{
+            gap: collapsed ? 0 : '10px',
+            padding: collapsed ? '9px 0' : '8px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            color: themeHover ? bright : muted,
+            background: themeHover ? 'rgba(255,255,255,0.04)' : 'transparent',
+          }}
         >
-          {dark ? <Sun size={16} /> : <Moon size={16} />}
-          <span>{dark ? 'Modo claro' : 'Modo escuro'}</span>
+          <i className={`ph-light ${dark ? 'ph-sun' : 'ph-moon'}`} style={{ fontSize: '16px', lineHeight: 1, flexShrink: 0 }} />
+          {!collapsed && <span style={ITEM_LABEL}>{dark ? 'Modo Claro' : 'Modo Escuro'}</span>}
         </button>
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-neutral-400 hover:text-danger hover:bg-red-950/30 text-sm transition-colors"
+          onMouseEnter={() => setLogoutHover(true)}
+          onMouseLeave={() => setLogoutHover(false)}
+          title="Sair"
+          className="w-full flex items-center rounded-md transition-all duration-150"
+          style={{
+            gap: collapsed ? 0 : '10px',
+            padding: collapsed ? '9px 0' : '8px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            color: logoutHover ? '#EF4444' : muted,
+            background: logoutHover ? 'rgba(239,68,68,0.08)' : 'transparent',
+          }}
         >
-          <LogOut size={16} />
-          <span>Sair</span>
+          <i className="ph-light ph-sign-out" style={{ fontSize: '16px', lineHeight: 1, flexShrink: 0 }} />
+          {!collapsed && <span style={ITEM_LABEL}>Sair</span>}
         </button>
       </div>
 
-      {/* Profile — minimal button pinned to the very bottom, links to /perfil */}
+      {/* ─── PROFILE (rodapé) ─── */}
       {user && (
         <Link
           to="/perfil"
           onClick={onClose}
-          className="group flex items-center gap-3 px-4 py-3 border-t hover:bg-carvao-surface1 transition-colors shrink-0"
-          style={{ borderColor: 'var(--sidebar-border)' }}
+          className="flex items-center shrink-0 transition-all duration-150"
+          style={{
+            borderTop: divider,
+            gap: collapsed ? 0 : '10px',
+            padding: collapsed ? '12px 0' : '10px 14px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            background: 'rgba(255,255,255,0.02)',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(74,17,162,0.10)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
         >
-          <UserAvatar user={user} />
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-semibold truncate leading-tight">{user.name}</p>
-            <p className="text-neutral-500 text-[11px] font-mono truncate leading-tight mt-0.5">
-              {user.title ?? (user.role === 'socio' ? 'Sócio' : 'Estagiário')}
-            </p>
-          </div>
-          <ChevronRight size={14} className="text-neutral-600 group-hover:text-viper-400 shrink-0 transition-colors" />
+          <UserAvatar user={user} size={34} />
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p style={{
+                  fontFamily: 'Geist, sans-serif', fontWeight: 600,
+                  fontSize: '12px', color: '#F5F5F7',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {user.name}
+                </p>
+                <p style={{
+                  fontFamily: 'Oswald, sans-serif', fontWeight: 500,
+                  fontSize: '8.5px', color: '#6B28C4',
+                  letterSpacing: '0.20em', textTransform: 'uppercase', marginTop: '2px',
+                }}>
+                  {user.title ?? (user.role === 'socio' ? 'Sócio' : 'Estagiário')}
+                </p>
+              </div>
+              <i className="ph-light ph-caret-right" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
+            </>
+          )}
         </Link>
       )}
     </aside>
+  );
+}
+
+/* ─── Botão de colapso no header ─── */
+function CollapseButton({ collapsed, onToggle, center }: { collapsed: boolean; onToggle?: () => void; center?: boolean }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onClick={onToggle}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+      style={{
+        flexShrink: 0,
+        width: center ? '44px' : '32px',
+        height: center ? '44px' : '32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '10px',
+        cursor: 'pointer',
+        border: `0.5px solid ${hovered ? 'rgba(153,102,224,0.55)' : 'rgba(255,255,255,0.10)'}`,
+        transition: 'all 0.18s ease',
+        background: hovered
+          ? 'rgba(74,17,162,0.30)'
+          : center ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.04)',
+        color: hovered ? '#C9B6F0' : 'rgba(255,255,255,0.50)',
+        boxShadow: hovered ? '0 0 16px rgba(74,17,162,0.35), inset 0 0 8px rgba(74,17,162,0.10)' : 'none',
+        margin: center ? '0 auto' : undefined,
+      }}
+    >
+      <i
+        className="ph-light ph-sidebar-simple"
+        style={{ fontSize: center ? '18px' : '15px', lineHeight: 1, transform: collapsed ? 'scaleX(-1)' : 'none', transition: 'transform 0.3s ease' }}
+      />
+    </button>
+  );
+}
+
+/* ─── Item de nav ─── */
+interface SidebarItemProps {
+  icon: string;
+  label: string;
+  isActive: boolean;
+  collapsed: boolean;
+  muted: string;
+  bright: string;
+}
+
+function SidebarItem({ icon, label, isActive, collapsed, muted, bright }: SidebarItemProps) {
+  const [hovered, setHovered] = useState(false);
+
+  /* Ativo: roxo escuro sólido | Hover: versão mais suave do mesmo estilo */
+  const ACTIVE_COLOR = '#5B1FB5';
+  const ACTIVE_GLOW  = 'rgba(91,31,181,0.85)';
+  const HOVER_COLOR  = 'rgba(107,40,196,0.55)';
+  const HOVER_GLOW   = 'rgba(107,40,196,0.40)';
+
+  const showBar = isActive || hovered;
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={collapsed ? label : undefined}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: collapsed ? 0 : '12px',
+        padding: collapsed ? '11px 0' : '10px 14px 10px 18px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        marginBottom: '5px',
+        transition: 'background 0.20s ease, color 0.20s ease',
+        color: isActive ? '#FFFFFF' : hovered ? '#E0D4F7' : muted,
+        background: hovered && !isActive
+          ? 'rgba(255,255,255,0.05)'
+          : 'transparent',
+      }}
+    >
+      {/* Barra lateral — aparece tanto no hover quanto no ativo */}
+      <span style={{
+        position: 'absolute',
+        left: 0,
+        top: '18%',
+        bottom: '18%',
+        width: isActive ? '3px' : '2px',
+        borderRadius: '0 4px 4px 0',
+        background: isActive ? ACTIVE_COLOR : HOVER_COLOR,
+        opacity: showBar ? 1 : 0,
+        boxShadow: isActive
+          ? `0 0 12px 4px ${ACTIVE_GLOW}, 0 0 4px 2px ${ACTIVE_COLOR}`
+          : `0 0 8px 2px ${HOVER_GLOW}`,
+        transition: 'opacity 0.20s ease, width 0.20s ease, background 0.20s ease, box-shadow 0.20s ease',
+      }} />
+
+      <i
+        className={`ph-light ${icon}`}
+        style={{
+          fontSize: '18px',
+          lineHeight: 1,
+          flexShrink: 0,
+          color: isActive ? '#FFFFFF' : hovered ? '#C9B6F0' : 'inherit',
+          transition: 'color 0.20s ease, filter 0.20s ease',
+          filter: isActive
+            ? 'drop-shadow(0 0 6px rgba(91,31,181,0.60))'
+            : hovered
+            ? 'drop-shadow(0 0 5px rgba(107,40,196,0.50))'
+            : 'none',
+        }}
+      />
+
+      {!collapsed && (
+        <span style={{
+          fontFamily: 'Oswald, sans-serif',
+          fontWeight: isActive ? 600 : 500,
+          fontSize: '12px',
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+        }}>
+          {label}
+        </span>
+      )}
+    </div>
   );
 }

@@ -88,7 +88,7 @@ function AssigneePicker({ value, onToggle, users }: { value: string[]; onToggle:
             onClick={() => onToggle(u.id)}
             className={`chip flex items-center gap-2 px-3 py-2 rounded-md text-sm ${isSelected ? 'chip-selected' : ''}`}
           >
-            <Avatar user={u} size={24} fontSize={10} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
+            <Avatar user={u} size={24} fontSize={10} fallbackClassName="" />
             {u.name}
           </button>
         );

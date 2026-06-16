@@ -96,7 +96,7 @@ function AssigneePicker({ value, onToggle, users }: { value: string[]; onToggle:
             onClick={() => onToggle(u.id)}
             className={`chip flex items-center gap-2 px-3 py-2 rounded-md text-sm ${isSelected ? 'chip-selected' : ''}`}
           >
-            <Avatar user={u} size={24} fontSize={10} fallbackClassName="bg-viper-100 dark:bg-carvao-surface2 text-viper-600 dark:text-viper-400" />
+            <Avatar user={u} size={24} fontSize={10} fallbackClassName="" />
             {u.name}
           </button>
         );
@@ -756,21 +756,23 @@ export function ActivityDetail() {
         }
       >
         <div className="space-y-4">
-          <FormField label="Título" required>
+          <FormField label="Título" required hint={`${createTaskForm.title.length}/30`}>
             <Input
               autoFocus
               value={createTaskForm.title}
-              onChange={(e) => setCreateTaskForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(e) => setCreateTaskForm((f) => ({ ...f, title: e.target.value.slice(0, 30) }))}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTask(); } }}
               placeholder="Ex.: Implementar tela de login"
+              maxLength={30}
             />
           </FormField>
-          <FormField label="Descrição">
+          <FormField label="Descrição" hint={`${createTaskForm.description.length}/2000`}>
             <Textarea
               value={createTaskForm.description}
-              onChange={(e) => setCreateTaskForm((f) => ({ ...f, description: e.target.value }))}
+              onChange={(e) => setCreateTaskForm((f) => ({ ...f, description: e.target.value.slice(0, 2000) }))}
               rows={3}
               placeholder="Descreva o que precisa ser feito..."
+              maxLength={2000}
             />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
@@ -828,11 +830,11 @@ export function ActivityDetail() {
       >
         {openSub && (subEditing ? (
           <div className="space-y-4">
-            <FormField label="Título" required>
-              <Input value={subEditForm.title} onChange={(e) => setSubEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus />
+            <FormField label="Título" required hint={`${subEditForm.title.length}/30`}>
+              <Input value={subEditForm.title} onChange={(e) => setSubEditForm((f) => ({ ...f, title: e.target.value.slice(0, 30) }))} autoFocus maxLength={30} />
             </FormField>
-            <FormField label="Descrição">
-              <Textarea value={subEditForm.description} onChange={(e) => setSubEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} placeholder="Detalhe a etapa..." />
+            <FormField label="Descrição" hint={`${subEditForm.description.length}/2000`}>
+              <Textarea value={subEditForm.description} onChange={(e) => setSubEditForm((f) => ({ ...f, description: e.target.value.slice(0, 2000) }))} rows={4} placeholder="Detalhe a etapa..." maxLength={2000} />
             </FormField>
           </div>
         ) : (
@@ -878,17 +880,18 @@ export function ActivityDetail() {
         }
       >
         <div className="space-y-4">
-          <FormField label="Título da etapa" required>
+          <FormField label="Título da etapa" required hint={`${subForm.title.length}/30`}>
             <Input
               autoFocus
               value={subForm.title}
-              onChange={(e) => setSubForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(e) => setSubForm((f) => ({ ...f, title: e.target.value.slice(0, 30) }))}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
               placeholder="Ex.: Validar formulário de login"
+              maxLength={30}
             />
           </FormField>
-          <FormField label="Descrição">
-            <Textarea value={subForm.description} onChange={(e) => setSubForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalhes da etapa (opcional)..." />
+          <FormField label="Descrição" hint={`${subForm.description.length}/2000`}>
+            <Textarea value={subForm.description} onChange={(e) => setSubForm((f) => ({ ...f, description: e.target.value.slice(0, 2000) }))} rows={3} placeholder="Detalhes da etapa (opcional)..." maxLength={2000} />
           </FormField>
         </div>
       </Modal>
@@ -909,11 +912,11 @@ export function ActivityDetail() {
         }
       >
         <div className="space-y-4">
-          <FormField label="Título" required>
-            <Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus />
+          <FormField label="Título" required hint={`${editForm.title.length}/30`}>
+            <Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value.slice(0, 30) }))} autoFocus maxLength={30} />
           </FormField>
-          <FormField label="Descrição">
-            <Textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Descreva o que precisa ser feito..." />
+          <FormField label="Descrição" hint={`${editForm.description.length}/2000`}>
+            <Textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value.slice(0, 2000) }))} rows={3} placeholder="Descreva o que precisa ser feito..." maxLength={2000} />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Cliente">
@@ -996,7 +999,7 @@ export function ActivityDetail() {
         }
       >
         <div className="space-y-3">
-          <Textarea value={projNoteText} onChange={(e) => setProjNoteText(e.target.value)} rows={4} placeholder="Escreva sua nota..." autoFocus />
+          <Textarea value={projNoteText} onChange={(e) => setProjNoteText(e.target.value.slice(0, 2000))} rows={4} placeholder="Escreva sua nota..." autoFocus maxLength={2000} />
           <div>
             <input ref={projNoteImageRef} type="file" accept="image/*,.gif" className="hidden" onChange={handleNoteImageChange} />
             {projNoteImagePreview ? (

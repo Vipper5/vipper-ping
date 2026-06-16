@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Edit3, Sun, CalendarRange, ChevronRight, Pencil, CheckCheck } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Badge, StatusBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -12,6 +11,7 @@ import { taskPeriod } from '../lib/tasks';
 import { progressState } from '../lib/progress';
 import { setTaskComplete } from '../lib/api';
 import { TaskPeriod } from '../mocks/data';
+import { Pencil } from 'lucide-react';
 
 function isToday(d: string) {
   return d === new Date().toISOString().split('T')[0];
@@ -19,95 +19,99 @@ function isToday(d: string) {
 function isThisWeek(d: string) {
   const now = new Date();
   const date = new Date(d + 'T00:00:00');
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  return date >= startOfWeek && date <= endOfWeek;
+  const start = new Date(now); start.setDate(now.getDate() - now.getDay());
+  const end   = new Date(start); end.setDate(start.getDate() + 6);
+  return date >= start && date <= end;
 }
 
-// Monochromatic purple — intensity grows with progress
-function progressColor(pct: number): string {
-  const sat = 42 + (pct / 100) * 32;
-  const light = 66 - (pct / 100) * 22;
-  return `hsl(272, ${sat}%, ${light}%)`;
-}
-
-interface ProgressMiniProps {
-  label: string;
-  icon: React.ReactNode;
-  done: number;
-  total: number;
-  subtitle: string;
-}
-
-// Card de progresso colorido no padrão do Dashboard (escala papel quente → vermelho → roxo → verde).
-function ProgressMini({ label, icon, done, total, subtitle }: ProgressMiniProps) {
+/* ── Card de progresso (hoje / semana) ─────────────────────────────── */
+function ProgressCard({ label, icon, done, total, subtitle, onClick }: {
+  label: string; icon: string; done: number; total: number; subtitle: string; onClick: () => void;
+}) {
   const { empty, pct, color } = progressState(done, total);
-  const cornerTint = empty ? 'var(--papel-quente-soft)' : `${color}1f`;
-  const iconBg = empty ? 'var(--papel-quente-tint)' : `${color}22`;
+  const [hovered, setHovered] = useState(false);
+  const cornerTint = empty ? 'rgba(255,255,255,0.03)' : `${color}18`;
+
   return (
-    <div
-      className="rounded-xl border p-5 relative overflow-hidden"
+    <button type="button" onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="rounded-lg p-5 flex flex-col gap-3 transition-all duration-200 text-left w-full relative overflow-hidden"
       style={{
-        backgroundColor: 'var(--surface)',
-        backgroundImage: `linear-gradient(135deg, ${cornerTint}, transparent 60%)`,
-        borderColor: 'var(--border)',
+        background: 'var(--surface)',
+        backgroundImage: `linear-gradient(135deg, ${cornerTint}, transparent 55%)`,
+        border: hovered && !empty ? `1px solid ${color}` : '0.5px solid var(--border)',
+        boxShadow: hovered && !empty ? `0 0 16px ${color}25` : 'none',
+        cursor: 'pointer',
       }}
     >
       <div className="flex items-center gap-2">
-        <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: iconBg, color }}>
-          {icon}
+        <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+          style={{ background: empty ? 'var(--bg-subtle)' : `${color}20`, color: empty ? 'var(--text-muted)' : color }}>
+          <i className={`ph-light ${icon}`} style={{ fontSize: '15px' }} />
         </span>
-        <p className="text-xs font-mono uppercase tracking-wider text-base-muted">{label}</p>
+        <span className="font-label text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+          {label.toUpperCase()}
+        </span>
       </div>
-
       {empty ? (
-        <div className="mt-3 mb-1.5">
-          <span className="text-sm font-semibold leading-snug block" style={{ color }}>Aguarde por novas atividades</span>
-        </div>
+        <p className="text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'Geist, system-ui' }}>
+          Sem atividades no período
+        </p>
       ) : (
-        <div className="flex items-baseline justify-between mt-3 mb-1.5">
-          <span className="text-3xl font-bold font-num tracking-tight leading-none" style={{ color }}>{pct}%</span>
-          <span className="text-xs font-num text-base-muted">{done}/{total}</span>
+        <div className="flex items-baseline justify-between">
+          <span className="font-num text-[32px] font-bold leading-none" style={{ color }}>{pct}%</span>
+          <span className="font-num text-[12px]" style={{ color: 'var(--text-muted)' }}>{done}/{total}</span>
         </div>
       )}
-      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: empty ? '100%' : `${pct}%`, backgroundColor: color, opacity: empty ? 0.35 : 1 }}
-        />
+      <div>
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
+          <div className="h-full rounded-full transition-all duration-700"
+            style={{ width: empty ? '100%' : `${pct}%`, background: empty ? 'var(--border)' : color, opacity: empty ? 0.3 : 1 }} />
+        </div>
+        <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)', fontFamily: 'Geist, system-ui' }}>
+          {subtitle}
+        </p>
       </div>
-      <p className="text-xs text-base-muted mt-2">{subtitle}</p>
-    </div>
-  );
-}
-
-// Mini card clicável com a quantidade de atividades concluídas de um período.
-function DoneStat({
-  label, icon, count, color, onClick,
-}: { label: string; icon: React.ReactNode; count: number; color: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group rounded-lg border p-3 text-left transition-colors hover:bg-subtle"
-      style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-    >
-      <div className="flex items-center gap-2">
-        <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1f`, color }}>
-          {icon}
-        </span>
-        <span className="text-2xl font-bold font-num tracking-tight" style={{ color }}>{count}</span>
-      </div>
-      <p className="text-[11px] font-medium text-base-secondary mt-1.5">{label}</p>
-      <p className="inline-flex items-center gap-0.5 text-[10px] text-base-muted group-hover:text-viper-500 transition-colors mt-0.5">
-        ver lista <ChevronRight size={10} />
-      </p>
     </button>
   );
 }
 
+/* ── Card de stat clicável (tasks feitas / projetos feitos) ─────────── */
+function DoneCard({ label, icon, count, accentColor, onClick }: {
+  label: string; icon: string; count: number; accentColor: string; onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button type="button" onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="text-left rounded-lg p-4 flex flex-col gap-2 transition-all duration-200 w-full"
+      style={{
+        background: 'var(--surface)',
+        border: hovered ? `1px solid ${accentColor}` : '0.5px solid var(--border)',
+        boxShadow: hovered ? `0 0 14px ${accentColor}30` : 'none',
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+          style={{ background: `${accentColor}18`, color: accentColor }}>
+          <i className={`ph-light ${icon}`} style={{ fontSize: '14px' }} />
+        </span>
+        <span className="font-num text-[26px] font-bold leading-none" style={{ color: accentColor }}>{count}</span>
+      </div>
+      <p className="text-xs font-medium" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-secondary)' }}>{label}</p>
+      <span className="flex items-center gap-0.5 font-label text-[9px] tracking-[0.08em] transition-colors"
+        style={{ color: hovered ? accentColor : 'var(--text-muted)' }}>
+        VER LISTA <i className="ph-light ph-caret-right" style={{ fontSize: '10px' }} />
+      </span>
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PÁGINA
+═══════════════════════════════════════════════════════════════════════ */
 export function MemberDetail() {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useAuth();
@@ -117,309 +121,334 @@ export function MemberDetail() {
   const { data: projects } = useProjects();
 
   const member = users.find((u) => u.id === id);
-  const [doneModal, setDoneModal] = useState<TaskPeriod | 'all' | null>(null);
+  const [doneModal, setDoneModal]         = useState<TaskPeriod | 'all' | null>(null);
+  const [periodModal, setPeriodModal]     = useState<'today' | 'week' | null>(null);
 
-  if (usersLoading) {
-    return (
-      <Layout title="Carregando…">
-        <Loading />
-      </Layout>
-    );
-  }
+  if (usersLoading) return <Layout title="Carregando…"><Loading /></Layout>;
+  if (!member) return (
+    <Layout title="Membro não encontrado" back={{ to: '/membros', label: 'Membros' }}>
+      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Membro não encontrado.</p>
+    </Layout>
+  );
 
-  if (!member) {
-    return (
-      <Layout title="Membro não encontrado">
-        <Link to="/membros" className="text-viper-500 hover:text-viper-400 flex items-center gap-1 text-sm">
-          <ArrowLeft size={14} /> Voltar para membros
-        </Link>
-      </Layout>
-    );
-  }
+  const isSelf   = currentUser?.id === member.id;
+  const canEdit  = currentUser?.role === 'socio' && member.role === 'estagiario';
 
-  const isSelf = currentUser?.id === member.id;
-  const canEdit = currentUser?.role === 'socio' && member.role === 'estagiario';
-  const memberTasks = tasks.filter((t) => t.assignedTo.includes(member.id));
+  const memberTasks    = tasks.filter((t) => t.assignedTo.includes(member.id));
   const completedTasks = memberTasks.filter((t) => t.status === 'concluida');
+  const activeTasks    = memberTasks.filter((t) => t.status === 'em_andamento');
+  const pendingTasks   = memberTasks.filter((t) => t.status === 'pendente');
 
-  // Barras de progressão de hoje/semana (por prazo — como antes).
   const todayTasks = memberTasks.filter((t) => isToday(t.dueDate));
-  const weekTasks = memberTasks.filter((t) => isThisWeek(t.dueDate));
-  const todayDone = todayTasks.filter((t) => t.status === 'concluida').length;
-  const weekDone = weekTasks.filter((t) => t.status === 'concluida').length;
+  const weekTasks  = memberTasks.filter((t) => isThisWeek(t.dueDate));
+  const todayDone  = todayTasks.filter((t) => t.status === 'concluida').length;
+  const weekDone   = weekTasks.filter((t) => t.status === 'concluida').length;
 
-  // Atividades concluídas por período (tasks x projetos) — usadas nos mini cards/popup.
-  const dailyDone = memberTasks.filter((t) => taskPeriod(t) === 'diaria' && t.status === 'concluida');
+  const dailyDone  = memberTasks.filter((t) => taskPeriod(t) === 'diaria'  && t.status === 'concluida');
   const weeklyDone = memberTasks.filter((t) => taskPeriod(t) === 'semanal' && t.status === 'concluida');
   const modalTasks = doneModal === 'diaria' ? dailyDone : doneModal === 'semanal' ? weeklyDone : doneModal === 'all' ? completedTasks : [];
 
-  const totalPct =
-    memberTasks.length > 0 ? Math.round((completedTasks.length / memberTasks.length) * 100) : 0;
+  const totalPct = memberTasks.length > 0 ? Math.round((completedTasks.length / memberTasks.length) * 100) : 0;
+  const { color: barColor } = progressState(completedTasks.length, memberTasks.length);
 
-  const getProjectName = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
+  const getProjectName = (pid: string) => projects.find((p) => p.id === pid)?.name ?? '';
 
   const toggleTaskStatus = async (taskId: string) => {
-    const current = tasks.find((t) => t.id === taskId);
-    if (!current) return;
-    const completing = current.status !== 'concluida';
-    await setTaskComplete(taskId, completing);
-    if (completing) toast.success('🏆 Task Concluída!');
+    const t = tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    await setTaskComplete(taskId, t.status !== 'concluida');
+    if (t.status !== 'concluida') toast.success('Task concluída!');
     reload();
+  };
+
+  const STATUS_DOT: Record<string, string> = {
+    concluida:    '#1D9E75',
+    em_andamento: '#378ADD',
+    pendente:     '#8A8A96',
   };
 
   return (
     <Layout
       title={member.name}
-      subtitle={member.title}
       back={{ to: '/membros', label: 'Membros' }}
       action={
         isSelf ? (
-          <Link
-            to="/perfil"
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border border-viper-500 text-viper-500 bg-transparent transition-all duration-150 hover:bg-viper-500 hover:text-white hover:shadow-[0_0_16px_rgba(134,55,204,0.55)]"
-          >
-            <Pencil size={14} /> <span className="hidden sm:inline">Editar perfil</span>
+          <Link to="/perfil"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-150"
+            style={{ border: '0.5px solid #4A11A2', color: '#9966E0' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(74,17,162,0.10)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+            <Pencil size={13} /> Editar perfil
           </Link>
         ) : undefined
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: profile card + overall progress */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* ── COLUNA ESQUERDA ── */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Avatar + identity */}
-          <div
-            className="rounded-xl border p-6 flex flex-col items-center text-center"
-            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-          >
-            <div className="w-20 h-20 rounded-full bg-viper-700 flex items-center justify-center mb-4 ring-4 ring-viper-500/20 overflow-hidden">
-              {member.photo ? (
-                <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-2xl font-bold text-viper-200 font-mono">{member.initials}</span>
+
+          {/* Card de perfil */}
+          <div className="rounded-lg overflow-hidden" style={{ border: '0.5px solid var(--border)', background: 'var(--surface)' }}>
+            <div className="p-6 flex flex-col items-center text-center">
+              {/* Avatar */}
+              <div className="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden mb-4"
+                style={{ background: 'rgba(74,17,162,0.18)', border: '2px solid rgba(74,17,162,0.40)', boxShadow: '0 0 20px rgba(74,17,162,0.20)' }}>
+                {member.photo
+                  ? <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+                  : <span className="text-2xl font-bold font-mono" style={{ color: '#C9B6F0' }}>{member.initials}</span>}
+              </div>
+
+              <h2 className="font-semibold text-[17px]" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-primary)' }}>{member.name}</h2>
+              {member.title && (
+                <p className="text-xs mt-0.5" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>{member.title}</p>
               )}
-            </div>
-            <h2 className="text-lg font-bold text-base-primary">{member.name}</h2>
-            <p className="text-sm text-base-muted mt-0.5">{member.title}</p>
-            <div className="mt-3">
-              <Badge variant={member.role === 'socio' ? 'primary' : 'neutral'}>
-                {member.role === 'socio' ? 'Sócio' : 'Estagiário'}
-              </Badge>
-            </div>
+              <div className="flex items-center gap-2 mt-2.5 flex-wrap justify-center">
+                <Badge variant={member.role === 'socio' ? 'primary' : 'neutral'}>
+                  {member.role === 'socio' ? 'Sócio' : 'Estagiário'}
+                </Badge>
+                {isSelf && <Badge variant="primary">Você</Badge>}
+              </div>
 
-            {member.bio && (
-              <p className="text-xs text-base-secondary mt-4 leading-relaxed text-left">{member.bio}</p>
-            )}
+              {member.bio && (
+                <p className="text-xs leading-relaxed mt-4 text-left" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-secondary)' }}>
+                  {member.bio}
+                </p>
+              )}
 
-            <div className="w-full mt-4 space-y-2 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-              {member.email && (
-                <div className="flex items-center gap-2 text-xs text-base-muted font-mono">
-                  <Mail size={12} className="text-viper-400 shrink-0" />
-                  <span className="truncate">{member.email}</span>
+              {/* Contatos */}
+              {(member.email || member.phone) && (
+                <div className="w-full mt-4 pt-4 space-y-2" style={{ borderTop: '0.5px solid var(--border)' }}>
+                  {member.email && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <i className="ph-light ph-envelope shrink-0" style={{ fontSize: '13px', color: '#9966E0' }} />
+                      <span style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }} className="truncate">{member.email}</span>
+                    </div>
+                  )}
+                  {member.phone && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <i className="ph-light ph-phone shrink-0" style={{ fontSize: '13px', color: '#9966E0' }} />
+                      <span style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>{member.phone}</span>
+                    </div>
+                  )}
                 </div>
               )}
-              {member.phone && (
-                <div className="flex items-center gap-2 text-xs text-base-muted font-mono">
-                  <Phone size={12} className="text-viper-400 shrink-0" />
-                  <span>{member.phone}</span>
+
+              {/* Responsabilidades */}
+              {member.responsibilities && member.responsibilities.length > 0 && (
+                <div className="w-full mt-4 pt-4" style={{ borderTop: '0.5px solid var(--border)' }}>
+                  <p className="font-label text-[9px] tracking-[0.14em] mb-2 text-left" style={{ color: 'var(--text-muted)' }}>RESPONSABILIDADES</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {member.responsibilities.map((r) => (
+                      <span key={r} className="font-label text-[9px] tracking-[0.06em] px-2 py-0.5 rounded"
+                        style={{ background: 'rgba(74,17,162,0.10)', color: '#9966E0', border: '0.5px solid rgba(74,17,162,0.20)' }}>
+                        {r}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Overall progress */}
-          <div
-            className="rounded-xl border p-5"
-            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-          >
-            <h3 className="text-xs font-mono uppercase tracking-wider text-base-muted mb-4">
-              Progresso geral
-            </h3>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-base-muted">
+          {/* Card de progresso geral */}
+          <div className="rounded-lg p-5 space-y-4" style={{ border: '0.5px solid var(--border)', background: 'var(--surface)' }}>
+            <p className="font-label text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>PROGRESSO GERAL</p>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>
                 {completedTasks.length} de {memberTasks.length} concluídas
               </span>
-              <span className="text-xl font-bold font-mono" style={{ color: progressColor(totalPct) }}>
-                {totalPct}%
-              </span>
+              <span className="font-num text-[20px] font-bold" style={{ color: barColor }}>{totalPct}%</span>
             </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${totalPct}%`, backgroundColor: progressColor(totalPct) }}
-              />
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${totalPct}%`, background: barColor }} />
             </div>
 
-            {/* Mini cards de atividades feitas — clique abre o popup com a lista */}
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <DoneStat
-                label="Tasks feitas"
-                icon={<Sun size={14} />}
-                count={dailyDone.length}
-                color="#F5AE39"
-                onClick={() => setDoneModal('diaria')}
-              />
-              <DoneStat
-                label="Projetos feitos"
-                icon={<CalendarRange size={14} />}
-                count={weeklyDone.length}
-                color="#8637CC"
-                onClick={() => setDoneModal('semanal')}
-              />
+            {/* Stats rápidas */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {[
+                { label: 'EM AND.', value: activeTasks.length,  color: '#378ADD' },
+                { label: 'PEND.',   value: pendingTasks.length,  color: '#EF9F27' },
+                { label: 'CONCL.',  value: completedTasks.length, color: '#1D9E75' },
+              ].map((s) => (
+                <div key={s.label} className="flex flex-col items-center py-2 rounded-md" style={{ background: 'var(--bg-subtle)' }}>
+                  <span className="font-num text-[17px] font-bold" style={{ color: s.color }}>{s.value}</span>
+                  <span className="font-label text-[8px] tracking-[0.08em] mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+                </div>
+              ))}
             </div>
 
-            {/* Todas as tasks feitas — abre o popup com todas as concluídas */}
-            <button
-              type="button"
-              onClick={() => setDoneModal('all')}
-              className="group w-full mt-3 inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-base-secondary transition-colors hover:bg-subtle hover:border-viper-500"
-              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
-            >
-              <CheckCheck size={15} className="text-success" />
-              Todas as tasks feitas
-              <span className="font-num font-bold text-success">{completedTasks.length}</span>
-              <ChevronRight size={14} className="text-base-muted group-hover:text-viper-500 transition-colors" />
+            {/* Mini cards clicáveis */}
+            <div className="grid grid-cols-2 gap-3">
+              <DoneCard label="Tasks feitas"    icon="ph-sun"            count={dailyDone.length}  accentColor="#EF9F27" onClick={() => setDoneModal('diaria')} />
+              <DoneCard label="Projetos feitos" icon="ph-calendar-dots" count={weeklyDone.length} accentColor="#9966E0" onClick={() => setDoneModal('semanal')} />
+            </div>
+
+            {/* Ver todas */}
+            <button type="button" onClick={() => setDoneModal('all')}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md transition-all duration-150 font-label text-[10px] tracking-[0.10em]"
+              style={{ border: '0.5px solid var(--border)', color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#1D9E75'; (e.currentTarget as HTMLElement).style.color = '#1D9E75'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
+              <i className="ph-light ph-check-circle" style={{ fontSize: '13px' }} />
+              TODAS AS TASKS FEITAS
+              <span className="font-num font-bold" style={{ color: '#1D9E75' }}>{completedTasks.length}</span>
+              <i className="ph-light ph-caret-right" style={{ fontSize: '11px' }} />
             </button>
           </div>
         </div>
 
-        {/* Right column: daily/weekly progress + task list */}
+        {/* ── COLUNA DIREITA ── */}
         <div className="lg:col-span-2 space-y-4">
+
+          {/* Cards de progresso hoje / semana */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <ProgressMini
+            <ProgressCard
               label="Progresso de hoje"
-              icon={<Sun size={15} />}
+              icon="ph-sun"
               done={todayDone}
               total={todayTasks.length}
               subtitle={todayTasks.length === 0 ? 'Sem tarefas hoje' : `${todayTasks.length} com prazo hoje`}
+              onClick={() => setPeriodModal('today')}
             />
-            <ProgressMini
+            <ProgressCard
               label="Progresso da semana"
-              icon={<CalendarRange size={15} />}
+              icon="ph-calendar-dots"
               done={weekDone}
               total={weekTasks.length}
               subtitle={weekTasks.length === 0 ? 'Sem tarefas esta semana' : `${weekTasks.length} na semana`}
+              onClick={() => setPeriodModal('week')}
             />
           </div>
 
-          {/* Task list */}
-          <div
-            className="rounded-xl border overflow-hidden"
-            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-          >
-            <div
-              className="flex items-center justify-between px-5 py-4 border-b"
-              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-subtle)' }}
-            >
-              <span className="text-xs font-mono uppercase tracking-wider text-base-muted">
-                Tasks ({memberTasks.length})
+          {/* Lista de tasks */}
+          <div className="rounded-lg overflow-hidden" style={{ border: '0.5px solid var(--border)', background: 'var(--surface)' }}>
+            <div className="flex items-center justify-between px-5 py-3" style={{ background: 'var(--bg-subtle)', borderBottom: '0.5px solid var(--border)' }}>
+              <span className="font-label text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                TASKS ({memberTasks.length})
               </span>
               {canEdit && (
-                <span className="text-xs text-viper-400 font-mono flex items-center gap-1.5">
-                  <Edit3 size={11} /> Modo edição ativo
+                <span className="font-label text-[9px] tracking-[0.10em] flex items-center gap-1.5" style={{ color: '#9966E0' }}>
+                  <i className="ph-light ph-pencil" style={{ fontSize: '11px' }} /> MODO EDIÇÃO
                 </span>
               )}
             </div>
 
             {memberTasks.length === 0 ? (
-              <div className="px-5 py-10 text-center text-base-muted text-sm">
-                Nenhuma task atribuída.
+              <div className="py-16 text-center">
+                <i className="ph-light ph-clipboard-text" style={{ fontSize: '32px', color: 'var(--text-muted)' }} />
+                <p className="font-label text-[10px] tracking-[0.14em] mt-3" style={{ color: 'var(--text-muted)' }}>NENHUMA TASK ATRIBUÍDA</p>
               </div>
             ) : (
               <div>
-                {memberTasks.map((task, i) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-4 px-5 py-3.5 border-b last:border-0"
-                    style={{ borderColor: 'var(--border)', backgroundColor: i % 2 === 0 ? 'var(--surface)' : 'var(--bg-subtle)' }}
-                  >
-                    {canEdit ? (
-                      <button
-                        onClick={() => toggleTaskStatus(task.id)}
-                        className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
-                          task.status === 'concluida'
-                            ? 'bg-success border-success'
-                            : 'border-neutral-400 hover:border-viper-500'
-                        }`}
-                      >
-                        {task.status === 'concluida' && (
-                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                            <path
-                              d="M1 4L3.5 6.5L9 1"
-                              stroke="white"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
+                {memberTasks.map((task) => {
+                  const isDone = task.status === 'concluida';
+                  const dot    = STATUS_DOT[task.status] ?? '#8A8A96';
+                  return (
+                    <div key={task.id}
+                      className="flex items-center gap-4 px-5 py-3 transition-colors list-row"
+                      style={{ borderBottom: '0.5px solid var(--border)' }}>
+
+                      {canEdit ? (
+                        <button onClick={() => toggleTaskStatus(task.id)}
+                          className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 transition-all"
+                          style={{ border: isDone ? 'none' : '1.5px solid rgba(255,255,255,0.22)', background: isDone ? '#1D9E75' : 'rgba(255,255,255,0.04)' }}>
+                          {isDone && <i className="ph-bold ph-check" style={{ fontSize: '10px', color: '#fff' }} />}
+                        </button>
+                      ) : (
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate"
+                          style={{ fontFamily: 'Geist, system-ui', color: isDone ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}>
+                          {task.title}
+                        </p>
+                        {task.projectId && (
+                          <p className="text-[11px] mt-0.5 truncate" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>
+                            {getProjectName(task.projectId)}
+                          </p>
                         )}
-                      </button>
-                    ) : (
-                      <div
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          task.status === 'concluida'
-                            ? 'bg-success'
-                            : task.status === 'em_andamento'
-                            ? 'bg-info'
-                            : 'bg-neutral-400'
-                        }`}
-                      />
-                    )}
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm font-medium truncate ${
-                          task.status === 'concluida'
-                            ? 'line-through text-base-muted'
-                            : 'text-base-primary'
-                        }`}
-                      >
-                        {task.title}
-                      </p>
-                      <p className="text-xs text-base-muted font-mono mt-0.5">
-                        {getProjectName(task.projectId)}
-                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <StatusBadge status={task.priority} />
+                        <StatusBadge status={task.status} />
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <StatusBadge status={task.priority} />
-                      <StatusBadge status={task.status} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Lista das atividades concluídas do período clicado */}
+      {/* Modal tasks do período (hoje / semana) */}
+      <Modal
+        open={periodModal !== null}
+        onClose={() => setPeriodModal(null)}
+        title={periodModal === 'today' ? 'Tasks de hoje' : 'Tasks da semana'}
+        description={`${periodModal === 'today' ? todayTasks.length : weekTasks.length} tasks com prazo no período`}
+        size="md"
+      >
+        {(() => {
+          const list = periodModal === 'today' ? todayTasks : weekTasks;
+          if (list.length === 0) return (
+            <p className="text-sm py-8 text-center" style={{ color: 'var(--text-muted)' }}>Nenhuma task neste período.</p>
+          );
+          return (
+            <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+              {list.map((task) => (
+                <Link key={task.id} to={`/atividades/${task.id}`} onClick={() => setPeriodModal(null)}
+                  className="flex items-center gap-3 p-3 rounded-md transition-colors"
+                  style={{ background: 'var(--bg-subtle)' }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--surface2)')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)')}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: task.status === 'concluida' ? '#1D9E75' : task.status === 'em_andamento' ? '#378ADD' : '#8A8A96' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ fontFamily: 'Geist, system-ui', color: task.status === 'concluida' ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: task.status === 'concluida' ? 'line-through' : 'none' }}>{task.title}</p>
+                    <p className="text-[11px] truncate" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>{getProjectName(task.projectId)}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <StatusBadge status={task.priority} />
+                    <StatusBadge status={task.status} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Modal de tasks concluídas */}
       <Modal
         open={doneModal !== null}
         onClose={() => setDoneModal(null)}
         title={doneModal === 'all' ? 'Todas as tasks concluídas' : doneModal === 'semanal' ? 'Projetos concluídos' : 'Tasks concluídas'}
-        description={`${modalTasks.length} ${modalTasks.length === 1 ? 'atividade concluída' : 'atividades concluídas'} por ${member.name}`}
+        description={`${modalTasks.length} ${modalTasks.length === 1 ? 'atividade' : 'atividades'} por ${member.name}`}
         size="md"
       >
         {modalTasks.length === 0 ? (
-          <p className="text-sm text-base-muted py-6 text-center">Nenhuma atividade concluída neste período.</p>
+          <p className="text-sm py-8 text-center" style={{ color: 'var(--text-muted)' }}>Nenhuma atividade concluída.</p>
         ) : (
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto -mr-2 pr-2">
+          <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
             {modalTasks.map((task) => {
               const isWeekly = taskPeriod(task) === 'semanal';
-              const PeriodIcon = isWeekly ? CalendarRange : Sun;
-              const periodColor = isWeekly ? '#8637CC' : '#F5AE39';
+              const periodColor = isWeekly ? '#9966E0' : '#EF9F27';
               return (
-                <Link
-                  key={task.id}
-                  to={`/atividades/${task.id}`}
-                  onClick={() => setDoneModal(null)}
-                  className="flex items-center gap-3 p-3 rounded-md transition-colors hover:bg-subtle"
-                  style={{ backgroundColor: 'var(--bg-subtle)' }}
-                >
-                  <PeriodIcon size={15} className="shrink-0" style={{ color: periodColor }} />
+                <Link key={task.id} to={`/atividades/${task.id}`} onClick={() => setDoneModal(null)}
+                  className="flex items-center gap-3 p-3 rounded-md transition-colors"
+                  style={{ background: 'var(--bg-subtle)' }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--surface2)')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)')}>
+                  <i className={`ph-light ${isWeekly ? 'ph-calendar-dots' : 'ph-sun'} shrink-0`}
+                    style={{ fontSize: '14px', color: periodColor }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-through text-base-muted truncate">{task.title}</p>
-                    <p className="text-xs text-base-muted font-mono truncate">{getProjectName(task.projectId)}</p>
+                    <p className="text-sm font-medium line-through truncate" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>{task.title}</p>
+                    <p className="text-[11px] truncate" style={{ fontFamily: 'Geist, system-ui', color: 'var(--text-muted)' }}>{getProjectName(task.projectId)}</p>
                   </div>
                   <StatusBadge status={task.status} />
                 </Link>

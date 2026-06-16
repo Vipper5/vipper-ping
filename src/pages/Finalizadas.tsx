@@ -88,7 +88,7 @@ export function Finalizadas() {
   ];
 
   return (
-    <Layout title="Tasks finalizadas" subtitle="Tudo o que já foi concluído">
+    <Layout title="Tasks finalizadas">
       <div className="flex flex-wrap items-center gap-3 mb-6">
         {/* Filtro de período */}
         <div className="flex gap-2 flex-wrap">
@@ -147,3 +147,4 @@ export function Finalizadas() {
     </Layout>
   );
 }
+

@@ -75,7 +75,6 @@ export function Ponto() {
   return (
     <Layout
       title="Ponto"
-      subtitle={`Registro de horas — ${user?.name ?? ''}`}
     >
       <div className="max-w-2xl mx-auto">
         {/* Clock card */}
@@ -101,13 +100,11 @@ export function Ponto() {
               return (
                 <div key={punch.key} className="flex flex-col items-center gap-1.5">
                   <div
-                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${
-                      isDone
-                        ? 'border-success bg-success/10'
-                        : isNext
-                        ? 'border-viper-500 bg-viper-500/10'
-                        : 'border-carvao-surface3 bg-carvao-surface2'
-                    }`}
+                    className="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all"
+                    style={{
+                      borderColor: isDone ? '#1D9E75' : isNext ? '#4A11A2' : '#1F1F24',
+                      background: isDone ? 'rgba(29,158,117,0.10)' : isNext ? 'rgba(74,17,162,0.10)' : '#141417',
+                    }}
                   >
                     {isDone ? (
                       <CheckCircle2 size={18} className="text-success" />
@@ -142,7 +139,7 @@ export function Ponto() {
               <ArrowRight size={18} />
             </button>
           ) : (
-            <div className="inline-flex items-center gap-2 bg-carvao-surface2 text-neutral-500 font-medium text-base px-8 py-4 rounded-xl">
+            <div className="inline-flex items-center gap-2 text-neutral-500 font-medium text-base px-8 py-4 rounded-xl" style={{ background: 'var(--surface2)' }}>
               <CheckCircle2 size={20} className="text-success" />
               Dia completo
             </div>

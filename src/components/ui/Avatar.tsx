@@ -24,7 +24,7 @@ export function Avatar({
   user,
   size = 24,
   className = '',
-  fallbackClassName = 'bg-viper-700 text-viper-200',
+  fallbackClassName = '',
   fontSize,
 }: AvatarProps) {
   const dim = { width: size, height: size };
@@ -43,7 +43,12 @@ export function Avatar({
   return (
     <span
       className={`rounded-full flex items-center justify-center shrink-0 font-bold font-mono ${fallbackClassName} ${className}`}
-      style={{ ...dim, fontSize: fontSize ?? Math.round(size * 0.38) }}
+      style={{
+        ...dim,
+        fontSize: fontSize ?? Math.round(size * 0.38),
+        background: fallbackClassName ? undefined : 'rgba(74,17,162,0.28)',
+        color: fallbackClassName ? undefined : '#C9B6F0',
+      }}
     >
       {user.initials}
     </span>

@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, Pencil, CalendarClock, ListChecks, Target } from 'lucide-react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/Badge';
@@ -15,15 +13,14 @@ import { Avatar } from '../components/ui/Avatar';
 import { createProject, updateProject } from '../lib/api';
 import { Project, ProjectStatus, Task, User } from '../mocks/data';
 
+// ─── helpers ───────────────────────────────────────────
+
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+    day: '2-digit', month: '2-digit', year: '2-digit',
   });
 }
 
-/** Data de hoje no formato yyyy-mm-dd (para inputs type="date"). */
 function todayISO(): string {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -33,34 +30,16 @@ function todayISO(): string {
 function daysUntil(d: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(d + 'T00:00:00');
-  return Math.round((target.getTime() - today.getTime()) / 86400000);
+  return Math.round((new Date(d + 'T00:00:00').getTime() - today.getTime()) / 86400000);
 }
 
-// Cor de acento do card por status do cliente.
-const STATUS_ACCENT: Record<ProjectStatus, string> = {
-  Ativo: '#047857',
-  'Em Desenvolvimento': '#1D4ED8',
-  Pausado: '#475569',
-  Pendente: '#B91C1C',
-  'Concluído': '#0F766E',
-};
-
-// Cor da barra de progresso por percentual: <35% vermelho, 35–74% roxo, ≥75% verde.
-function progressBarColor(pct: number): string {
-  if (pct >= 75) return '#047857';
-  if (pct >= 35) return '#8637CC';
-  return '#B91C1C';
-}
-
-// Metadados do prazo: cor + rótulo (relativo quando urgente, data caso contrário).
 function deadlineMeta(endDate: string, status: ProjectStatus): { color: string; label: string; urgent: boolean } {
   if (!endDate) return { color: 'var(--text-muted)', label: '—', urgent: false };
   if (status === 'Concluído') return { color: 'var(--text-muted)', label: 'Entregue', urgent: false };
   const days = daysUntil(endDate);
-  if (days < 0) return { color: '#B91C1C', label: `${Math.abs(days)}d em atraso`, urgent: true };
-  if (days === 0) return { color: '#B91C1C', label: 'Entrega hoje', urgent: true };
-  if (days <= 7) return { color: '#B45309', label: `Faltam ${days}d`, urgent: true };
+  if (days < 0)  return { color: '#EF4444', label: `${Math.abs(days)}d em atraso`, urgent: true };
+  if (days === 0) return { color: '#EF4444', label: 'Hoje', urgent: true };
+  if (days <= 7)  return { color: '#EF9F27', label: `${days}d`, urgent: true };
   return { color: 'var(--text-muted)', label: formatDate(endDate), urgent: false };
 }
 
@@ -71,29 +50,126 @@ function projectStats(projectId: string, allTasks: Task[]) {
   return { total: tasks.length, done, pct };
 }
 
-function Avatars({ ids, users }: { ids: string[]; users: User[] }) {
+function progressColor(pct: number): string {
+  if (pct >= 75) return '#1D9E75';
+  if (pct >= 35) return '#4A11A2';
+  return '#EF4444';
+}
+
+// ─── sub-componentes ─────────────────────────────────
+
+function AvatarStack({ ids, users }: { ids: string[]; users: User[] }) {
   return (
-    <div className="flex -space-x-1.5">
-      {ids.map((rid) => {
+    <div className="flex -space-x-2">
+      {ids.slice(0, 4).map((rid) => {
         const ru = users.find((u) => u.id === rid);
         return ru ? (
-          <div
-            key={rid}
-            className="w-6 h-6 rounded-full bg-viper-700 border-2 flex items-center justify-center overflow-hidden"
-            style={{ borderColor: 'var(--surface)' }}
-            title={ru.name}
-          >
+          <div key={rid} title={ru.name} className="w-6 h-6 rounded-full overflow-hidden shrink-0" style={{ border: '1.5px solid var(--surface)' }}>
             {ru.photo ? (
               <img src={ru.photo} alt={ru.name} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-viper-200 font-bold font-mono" style={{ fontSize: '9px' }}>{ru.initials}</span>
+              <div className="w-full h-full flex items-center justify-center" style={{ background: 'rgba(74,17,162,0.30)', color: '#C9B6F0' }}>
+                <span style={{ fontSize: '8px', fontFamily: 'Oswald, sans-serif', fontWeight: 600 }}>{ru.initials}</span>
+              </div>
             )}
           </div>
         ) : null;
       })}
+      {ids.length > 4 && (
+        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ border: '1.5px solid var(--surface)', background: 'var(--surface2)', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '8px' }}>+{ids.length - 4}</span>
+        </div>
+      )}
     </div>
   );
 }
+
+// Dropdown de filtros customizado
+const STATUS_OPTIONS = [
+  { key: 'all',                label: 'TODOS',            dot: '#8A8A96' },
+  { key: 'Ativo',              label: 'ATIVOS',           dot: '#1D9E75' },
+  { key: 'Em Desenvolvimento', label: 'EM DESENVOLVIMENTO', dot: '#378ADD' },
+  { key: 'Pausado',            label: 'PAUSADOS',         dot: '#EF9F27' },
+  { key: 'Pendente',           label: 'PENDENTES',        dot: '#EF4444' },
+];
+
+function FilterDropdown({ value, onChange, counts }: {
+  value: string;
+  onChange: (v: string) => void;
+  counts: Record<string, number>;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  const current = STATUS_OPTIONS.find((o) => o.key === value) ?? STATUS_OPTIONS[0];
+  const count = counts[value] ?? 0;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((p) => !p)}
+        className="flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-150"
+        style={{
+          border: '0.5px solid var(--border)',
+          background: 'var(--surface)',
+          color: 'var(--text-secondary)',
+          minWidth: '180px',
+        }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: current.dot }} />
+        <span className="font-label text-[11px] tracking-[0.10em] flex-1 text-left">{current.label}</span>
+        <span
+          className="font-label text-[10px] px-1.5 py-0.5 rounded"
+          style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}
+        >
+          {count}
+        </span>
+        <i
+          className="ph-light ph-caret-down shrink-0"
+          style={{ fontSize: '13px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-muted)' }}
+        />
+      </button>
+
+      {open && (
+        <div
+          className="dropdown-menu absolute top-full left-0 mt-1 z-20 w-full py-1"
+          style={{ minWidth: '200px' }}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => { onChange(opt.key); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 transition-colors text-left"
+              style={{
+                background: value === opt.key ? 'rgba(74,17,162,0.10)' : 'transparent',
+                color: value === opt.key ? '#9966E0' : 'var(--text-secondary)',
+              }}
+              onMouseEnter={(e) => { if (value !== opt.key) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)'; }}
+              onMouseLeave={(e) => { if (value !== opt.key) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: opt.dot }} />
+              <span className="font-label text-[11px] tracking-[0.10em] flex-1">{opt.label}</span>
+              <span className="font-label text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                {counts[opt.key] ?? 0}
+              </span>
+              {value === opt.key && <i className="ph-light ph-check shrink-0" style={{ fontSize: '13px', color: '#4A11A2' }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── form ────────────────────────────────────────────
 
 interface ProjectFormData {
   name: string;
@@ -107,19 +183,18 @@ interface ProjectFormData {
 }
 
 const defaultForm: ProjectFormData = {
-  name: '',
-  client: '',
-  status: 'Ativo',
-  stack: '',
-  startDate: '',
-  endDate: '',
-  description: '',
-  responsibles: [],
+  name: '', client: '', status: 'Ativo', stack: '',
+  startDate: '', endDate: '', description: '', responsibles: [],
 };
+
+const STATUS_ORDER: Record<string, number> = {
+  Ativo: 0, 'Em Desenvolvimento': 1, Pausado: 2, Pendente: 3, 'Concluído': 4,
+};
+
+// ─── COMPONENT ───────────────────────────────────────
 
 export function Projects() {
   const { user } = useAuth();
-  const { dark } = useTheme();
   const toast = useToast();
   const { data: projects, loading, error, reload } = useProjects();
   const { data: tasks } = useTasks();
@@ -128,14 +203,13 @@ export function Projects() {
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [form, setForm] = useState<ProjectFormData>(defaultForm);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [hoveredFilter, setHoveredFilter] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   const isSocio = user?.role === 'socio';
 
   const openCreate = () => {
     setEditProject(null);
-    // Data de início já preenchida com o dia atual.
     setForm({ ...defaultForm, startDate: todayISO() });
     setShowModal(true);
   };
@@ -145,14 +219,9 @@ export function Projects() {
     e.stopPropagation();
     setEditProject(p);
     setForm({
-      name: p.name,
-      client: p.client,
-      status: p.status,
-      stack: p.stack.join(', '),
-      startDate: p.startDate,
-      endDate: p.endDate,
-      description: p.description,
-      responsibles: p.responsibles,
+      name: p.name, client: p.client, status: p.status,
+      stack: p.stack.join(', '), startDate: p.startDate,
+      endDate: p.endDate, description: p.description, responsibles: p.responsibles,
     });
     setShowModal(true);
   };
@@ -161,22 +230,14 @@ export function Projects() {
     if (!form.name.trim() || saving) return;
     const stackArr = form.stack.split(',').map((s) => s.trim()).filter(Boolean);
     const input = {
-      name: form.name,
-      client: form.client,
-      status: form.status,
-      stack: stackArr,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      description: form.description,
-      responsibles: form.responsibles,
+      name: form.name, client: form.client, status: form.status, stack: stackArr,
+      startDate: form.startDate, endDate: form.endDate,
+      description: form.description, responsibles: form.responsibles,
     };
     setSaving(true);
     try {
-      if (editProject) {
-        await updateProject(editProject.id, input);
-      } else {
-        await createProject(input);
-      }
+      if (editProject) { await updateProject(editProject.id, input); }
+      else { await createProject(input); }
       setShowModal(false);
       reload();
       toast.success('Operação concluída.');
@@ -187,11 +248,7 @@ export function Projects() {
     }
   };
 
-  // Fecha o modal sinalizando que a operação foi cancelada.
-  const cancelModal = () => {
-    setShowModal(false);
-    toast.error('Operação cancelada');
-  };
+  const cancelModal = () => { setShowModal(false); toast.error('Operação cancelada'); };
 
   const toggleResponsible = (id: string) => {
     setForm((f) => ({
@@ -202,20 +259,12 @@ export function Projects() {
     }));
   };
 
-  const counts = {
-    all: projects.length,
-    Ativo: projects.filter((p) => p.status === 'Ativo').length,
+  const counts: Record<string, number> = {
+    all:                  projects.length,
+    Ativo:                projects.filter((p) => p.status === 'Ativo').length,
     'Em Desenvolvimento': projects.filter((p) => p.status === 'Em Desenvolvimento').length,
-    Pausado: projects.filter((p) => p.status === 'Pausado').length,
-    Pendente: projects.filter((p) => p.status === 'Pendente').length,
-  };
-
-  const STATUS_ORDER: Record<string, number> = {
-    Ativo: 0,
-    'Em Desenvolvimento': 1,
-    Pausado: 2,
-    Pendente: 3,
-    'Concluído': 4,
+    Pausado:              projects.filter((p) => p.status === 'Pausado').length,
+    Pendente:             projects.filter((p) => p.status === 'Pendente').length,
   };
 
   const sortProjects = (list: Project[]) =>
@@ -225,195 +274,178 @@ export function Projects() {
     });
 
   const filtered = sortProjects(
-    statusFilter === 'all' ? projects : projects.filter((p) => p.status === statusFilter),
+    projects
+      .filter((p) => statusFilter === 'all' || p.status === statusFilter)
+      .filter((p) => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        return p.name.toLowerCase().includes(q) || p.client.toLowerCase().includes(q);
+      }),
   );
-
-  const filters: { key: string; label: string }[] = [
-    { key: 'all', label: 'Todos' },
-    { key: 'Ativo', label: 'Ativos' },
-    { key: 'Em Desenvolvimento', label: 'Em Desenvolvimento' },
-    { key: 'Pausado', label: 'Pausados' },
-    { key: 'Pendente', label: 'Pendentes' },
-  ];
-
-  // Cor de cada filtro. `darkText` = texto escuro em light mode (garante contraste no fundo claro).
-  const filterColors: Record<string, { base: string; light: string; glow: string; darkText: string }> = {
-    all:                  { base: '#6D28D9', light: '#7C3AED', glow: '109,40,217',  darkText: '#5B21B6' },
-    Ativo:                { base: '#047857', light: '#059669', glow: '4,120,87',    darkText: '#065F46' },
-    'Em Desenvolvimento': { base: '#1D4ED8', light: '#2563EB', glow: '29,78,216',  darkText: '#1E40AF' },
-    Pausado:              { base: '#475569', light: '#64748B', glow: '71,85,105',   darkText: '#334155' },
-    Pendente:             { base: '#B91C1C', light: '#DC2626', glow: '185,28,28',   darkText: '#991B1B' },
-  };
 
   return (
     <Layout
       title="Clientes"
-      subtitle={`${counts.Ativo} ativos · ${projects.length} no total`}
       action={
         isSocio ? (
           <Button variant="primary" size="sm" onClick={openCreate}>
-            <Plus size={15} /> Novo cliente
+            <i className="ph-light ph-plus" style={{ fontSize: '15px' }} /> Novo cliente
           </Button>
         ) : undefined
       }
     >
-      {/* Filtros com contagem — cor + brilho neon característicos de cada status */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {filters.map((f) => {
-          const active = statusFilter === f.key;
-          const isHover = hoveredFilter === f.key;
-          const c = filterColors[f.key];
-          const inactiveText = dark ? (isHover ? c.light : c.base) : (isHover ? c.light : c.darkText);
-          const style: React.CSSProperties = active
-            ? {
-                backgroundColor: isHover ? c.light : c.base,
-                borderColor: isHover ? c.light : c.base,
-                color: '#fff',
-                boxShadow: dark ? `0 0 12px rgba(${c.glow},${isHover ? 0.35 : 0.22})` : 'none',
-              }
-            : {
-                backgroundColor: isHover ? `rgba(${c.glow},0.10)` : 'transparent',
-                borderColor: inactiveText,
-                color: inactiveText,
-                boxShadow: 'none',
-              };
-          return (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              onMouseEnter={() => setHoveredFilter(f.key)}
-              onMouseLeave={() => setHoveredFilter(null)}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-medium border transition-all duration-150"
-              style={style}
-            >
-              {f.label}
-              <span
-                className="text-xs font-mono px-1.5 rounded-md"
-                style={
-                  active
-                    ? { backgroundColor: 'rgba(255,255,255,0.2)' }
-                    : { backgroundColor: `rgba(${c.glow},0.12)`, color: inactiveText }
-                }
-              >
-                {counts[f.key as keyof typeof counts]}
-              </span>
-            </button>
-          );
-        })}
+      {/* ─── TOOLBAR ─── */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <i
+            className="ph-light ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ fontSize: '15px', color: 'var(--text-muted)' }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar cliente…"
+            className="w-full pl-8 pr-3 py-2 rounded-md text-sm transition-all"
+            style={{
+              background: 'var(--surface)',
+              border: '0.5px solid var(--border)',
+              color: 'var(--text-primary)',
+              fontFamily: 'Geist, system-ui',
+              outline: 'none',
+            }}
+            onFocus={(e) => (e.target.style.borderColor = '#4A11A2')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
+          />
+        </div>
+
+        {/* Filter dropdown */}
+        <FilterDropdown value={statusFilter} onChange={setStatusFilter} counts={counts} />
       </div>
 
+      {/* ─── LISTA ─── */}
       {loading ? (
         <Loading label="Carregando clientes…" />
       ) : error ? (
         <ErrorState message={error} />
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-base-muted">
-          <div className="w-12 h-12 mx-auto rounded-md border-2 border-dashed flex items-center justify-center mb-3" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-xl">📂</span>
-          </div>
-          <p className="text-sm">Nenhum cliente encontrado.</p>
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <i className="ph-light ph-folder-open" style={{ fontSize: '40px', color: 'var(--text-muted)' }} />
+          <p className="font-label text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+            NENHUM CLIENTE ENCONTRADO
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="rounded-lg overflow-hidden" style={{ border: '0.5px solid var(--border)', background: 'var(--surface)' }}>
+          {/* Cabeçalho da lista */}
+          <div
+            className="grid items-center px-4 py-2.5"
+            style={{
+              gridTemplateColumns: '1fr 120px 160px 80px 110px 36px',
+              background: 'var(--bg-subtle)',
+              borderBottom: '0.5px solid var(--border)',
+            }}
+          >
+            {['CLIENTE', 'RESPONSÁVEIS', 'PROGRESSO', 'TASKS', 'PRAZO', ''].map((h) => (
+              <span
+                key={h}
+                className="font-label text-[10px] tracking-[0.14em]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {h}
+              </span>
+            ))}
+          </div>
+
+          {/* Linhas */}
           {filtered.map((project) => {
             const st = projectStats(project.id, tasks);
             const dl = deadlineMeta(project.endDate, project.status);
-            const accent = STATUS_ACCENT[project.status] ?? '#8637CC';
-            const objTotal = project.objectives.length;
-            const objDone = project.objectives.filter((o) => o.done).length;
+            const pc = progressColor(st.pct);
+
             return (
               <Link
                 key={project.id}
                 to={`/projetos/${project.id}`}
-                className="group relative card-interactive rounded-lg overflow-hidden p-4 pl-5 flex flex-col"
+                className="group list-row grid items-center px-4 py-3"
+                style={{ gridTemplateColumns: '1fr 120px 160px 80px 110px 36px' }}
               >
-                {/* Acento lateral por status */}
-                <span className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: accent }} />
-
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-mono font-semibold text-base-primary text-[15px] truncate group-hover:text-viper-500 transition-colors">
+                {/* Nome + cliente + status */}
+                <div className="min-w-0 pr-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p
+                      className="text-sm font-semibold truncate transition-colors"
+                      style={{ color: 'var(--text-primary)', fontFamily: 'Geist, system-ui' }}
+                    >
                       {project.name}
                     </p>
-                    <p className="text-xs text-base-muted mt-0.5 truncate">{project.client}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
                     <StatusBadge status={project.status} />
-                    {isSocio && (
-                      <button
-                        onClick={(e) => openEdit(project, e)}
-                        title="Editar cliente"
-                        className="p-1 rounded text-base-muted hover:text-viper-500 hover:bg-viper-50 dark:hover:bg-carvao-surface2 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                    )}
                   </div>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)', fontFamily: 'Geist, system-ui' }}>
+                    {project.client}
+                  </p>
                 </div>
 
-                {/* Stack */}
-                {project.stack.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-3">
-                    {project.stack.slice(0, 4).map((s) => (
-                      <span
-                        key={s}
-                        className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-                        style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--text-muted)' }}
-                      >
-                        {s}
-                      </span>
-                    ))}
-                    {project.stack.length > 4 && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
-                        +{project.stack.length - 4}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* Responsáveis */}
+                <div>
+                  <AvatarStack ids={project.responsibles} users={users} />
+                </div>
 
-                {/* Progresso (empurrado para a base p/ alinhar os cards) */}
-                <div className="mt-auto pt-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="inline-flex items-center gap-1.5 text-xs text-base-muted">
-                      <ListChecks size={13} /> {st.done}/{st.total} tarefas
-                    </span>
-                    <span className="text-sm font-num font-bold" style={{ color: progressBarColor(st.pct) }}>{st.pct}%</span>
+                {/* Progresso */}
+                <div className="pr-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-num text-[11px] font-bold" style={{ color: pc }}>{st.pct}%</span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--track)' }}>
+                  <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--track)' }}>
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${st.pct}%`, backgroundColor: progressBarColor(st.pct), transition: 'width 0.6s ease' }}
+                      style={{ width: `${st.pct}%`, background: pc, transition: 'width 0.6s ease' }}
                     />
                   </div>
-                  {objTotal > 0 && (
-                    <div className="flex items-center gap-1.5 mt-2 text-xs text-base-muted">
-                      <Target size={12} className="text-viper-400" />
-                      <span>{objDone}/{objTotal} objetivos</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Footer */}
-                <div
-                  className="flex items-center justify-between pt-4 mt-4 border-t"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <Avatars ids={project.responsibles} users={users} />
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-flex items-center gap-1.5 text-xs font-mono font-medium px-2 py-1 rounded-full"
-                      style={
-                        dl.urgent
-                          ? { backgroundColor: `${dl.color}1f`, color: dl.color }
-                          : { color: dl.color }
-                      }
+                {/* Tasks — ícone + contagem */}
+                <div className="flex items-center gap-1.5">
+                  <i className="ph-light ph-list-checks" style={{ fontSize: '14px', color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="font-num text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {st.done}<span style={{ color: 'var(--text-muted)' }}>/{st.total}</span>
+                  </span>
+                </div>
+
+                {/* Prazo */}
+                <div className="flex items-center gap-1.5">
+                  <i className="ph-light ph-calendar-blank" style={{ fontSize: '13px', color: dl.urgent ? dl.color : 'var(--text-muted)', flexShrink: 0 }} />
+                  <span
+                    className="font-label text-[10px] tracking-[0.06em]"
+                    style={{
+                      color: dl.color,
+                      background: dl.urgent ? `${dl.color}18` : 'transparent',
+                      padding: dl.urgent ? '1px 6px' : '0',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    {dl.label}
+                  </span>
+                </div>
+
+                {/* Ação */}
+                <div className="flex items-center justify-end gap-1">
+                  {isSocio && (
+                    <button
+                      onClick={(e) => openEdit(project, e)}
+                      title="Editar"
+                      className="p-1.5 rounded transition-all opacity-0 group-hover:opacity-100"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#4A11A2'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
                     >
-                      <CalendarClock size={12} />
-                      {dl.label}
-                    </span>
-                    <ArrowRight size={14} className="text-viper-500 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all" />
-                  </div>
+                      <i className="ph-light ph-pencil-simple" style={{ fontSize: '14px' }} />
+                    </button>
+                  )}
+                  <i
+                    className="ph-light ph-arrow-right opacity-0 group-hover:opacity-100 transition-all"
+                    style={{ fontSize: '14px', color: '#4A11A2' }}
+                  />
                 </div>
               </Link>
             );
@@ -421,7 +453,7 @@ export function Projects() {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* ─── MODAL CRIAR / EDITAR ─── */}
       <Modal
         open={showModal}
         onClose={cancelModal}

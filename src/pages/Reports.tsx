@@ -55,7 +55,7 @@ export function Reports() {
 
   if (loading) {
     return (
-      <Layout title="Relatórios" subtitle="Atividades concluídas por período">
+      <Layout title="Relatórios">
         <Loading label="Carregando relatórios…" />
       </Layout>
     );
@@ -64,7 +64,6 @@ export function Reports() {
   return (
     <Layout
       title="Relatórios"
-      subtitle="Tasks concluídas por período"
       action={
         <Button variant="secondary" size="sm">
           <Download size={14} /> Exportar CSV
@@ -134,7 +133,7 @@ export function Reports() {
               {byPerson.map((x) => (
                 <div key={x.name} className="flex items-center gap-3">
                   <span className="text-sm text-base-secondary w-20">{x.name}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-carvao-surface3">
+                  <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--track)' }}>
                     <div
                       className="h-full rounded-full bg-viper-500"
                       style={{ width: `${(x.count / filtered.length) * 100}%` }}
@@ -152,7 +151,7 @@ export function Reports() {
               {byProject.map((x) => (
                 <div key={x.name} className="flex items-center gap-3">
                   <span className="text-sm font-mono text-base-secondary w-24 truncate">{x.name}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-carvao-surface3">
+                  <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--track)' }}>
                     <div
                       className="h-full rounded-full bg-viper-400"
                       style={{ width: `${(x.count / filtered.length) * 100}%` }}

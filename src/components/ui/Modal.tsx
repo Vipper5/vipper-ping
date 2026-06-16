@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
 import { Button } from './Button';
 
 interface ModalProps {
@@ -22,47 +21,63 @@ export function Modal({ open, onClose, title, description, children, footer, siz
 
   if (!open) return null;
 
-  const widthMap = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' };
+  const maxW = { sm: '400px', md: '560px', lg: '720px' }[size];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      aria-modal="true"
-      role="dialog"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
+      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-carvao-base/70 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 animate-fade-in"
+        style={{ background: 'rgba(10,10,12,0.75)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}
       />
+
+      {/* Painel glass */}
       <div
-        className={`relative w-full ${widthMap[size]} max-h-[90dvh] overflow-y-auto rounded-xl border border-base bg-surface animate-slide-down`}
+        className="relative w-full max-h-[90dvh] overflow-y-auto animate-slide-down"
         style={{
-          backgroundColor: 'var(--surface)',
-          borderColor: 'var(--border)',
-          // Sombra perceptível nos dois temas para destacar o popup do fundo.
-          boxShadow: '0 24px 60px rgba(0,0,0,0.34), 0 8px 20px rgba(0,0,0,0.22)',
+          maxWidth: maxW,
+          background: 'var(--surface)',
+          border: '0.5px solid var(--border)',
+          borderRadius: '0.875rem',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.40), 0 8px 24px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}
       >
-        <div className="flex items-start justify-between gap-4 p-6 pb-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-base-primary">{title}</h2>
+            <h2
+              className="font-titulo"
+              style={{ fontSize: '18px', color: 'var(--text-primary)' }}
+            >
+              {title.toUpperCase()}
+            </h2>
             {description && (
-              <p className="mt-1 text-sm text-base-muted">{description}</p>
+              <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)', fontFamily: 'Geist, system-ui' }}>
+                {description}
+              </p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="shrink-0 rounded-md p-1 text-base-muted hover:text-base-primary hover:bg-subtle transition-colors"
+            className="shrink-0 p-1.5 rounded-md transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
           >
-            <X size={18} />
+            <i className="ph-light ph-x" style={{ fontSize: '18px', lineHeight: 1 }} />
           </button>
         </div>
 
+        {/* Body */}
         {children && <div className="px-6 pb-4">{children}</div>}
 
+        {/* Footer */}
         {footer && (
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-base"
-               style={{ borderColor: 'var(--border)' }}>
+          <div
+            className="flex justify-end gap-3 px-6 py-4"
+            style={{ borderTop: '0.5px solid var(--border)' }}
+          >
             {footer}
           </div>
         )}
@@ -80,14 +95,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
 }
 
-export function ConfirmModal({
-  open,
-  onClose,
-  onConfirm,
-  title,
-  description,
-  confirmLabel = 'Confirmar',
-}: ConfirmModalProps) {
+export function ConfirmModal({ open, onClose, onConfirm, title, description, confirmLabel = 'Confirmar' }: ConfirmModalProps) {
   return (
     <Modal
       open={open}
@@ -96,12 +104,14 @@ export function ConfirmModal({
       size="sm"
       footer={
         <>
-          <Button variant="tertiary" onClick={onClose}>Cancelar</Button>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button variant="destructive" onClick={() => { onConfirm(); onClose(); }}>{confirmLabel}</Button>
         </>
       }
     >
-      <p className="text-sm text-base-secondary">{description}</p>
+      <p className="text-sm" style={{ color: 'var(--text-secondary)', fontFamily: 'Geist, system-ui' }}>
+        {description}
+      </p>
     </Modal>
   );
 }

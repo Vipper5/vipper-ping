@@ -11,13 +11,13 @@ interface FormFieldProps {
 export function FormField({ label, error, hint, required, children }: FormFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-base-secondary">
-        {label}
-        {required && <span className="ml-0.5 text-danger">*</span>}
+      <label className="font-label text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+        {label.toUpperCase()}
+        {required && <span className="ml-0.5" style={{ color: '#EF4444' }}>*</span>}
       </label>
       {children}
-      {error && <p className="text-xs text-danger font-mono">{error}</p>}
-      {hint && !error && <p className="text-xs text-base-muted">{hint}</p>}
+      {error && <p className="text-xs font-mono" style={{ color: '#EF4444' }}>{error}</p>}
+      {hint && !error && <p className="text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'Geist, system-ui' }}>{hint}</p>}
     </div>
   );
 }

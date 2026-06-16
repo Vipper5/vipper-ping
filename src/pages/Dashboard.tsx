@@ -55,11 +55,11 @@ const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 // Categorias do calendário — espelham a página Agenda.
 type Category = 'entrega' | 'tarefa' | 'reuniao' | 'lembrete' | 'conclusao';
 const CATEGORY: Record<Category, { label: string; color: string }> = {
-  entrega: { label: 'Projeto', color: '#8637CC' },
-  tarefa: { label: 'Task', color: '#5294E6' },
-  reuniao: { label: 'Reunião', color: '#F5AE39' },
-  lembrete: { label: 'Lembrete', color: '#15BB77' },
-  conclusao: { label: 'Conclusão', color: '#E54056' },
+  entrega:  { label: 'Projeto',   color: '#9966E0' },
+  tarefa:   { label: 'Task',      color: '#378ADD' },
+  reuniao:  { label: 'Reunião',   color: '#EF9F27' },
+  lembrete: { label: 'Lembrete', color: '#1D9E75' },
+  conclusao:{ label: 'Conclusão', color: '#EF4444' },
 };
 const CATEGORY_PRIORITY: Record<Category, number> = {
   reuniao: 0, lembrete: 1, conclusao: 2, entrega: 3, tarefa: 4,
@@ -153,7 +153,7 @@ function MemberStrip({ member, tasks, isSelf }: { member: User; tasks: Task[]; i
     <Link
       to={`/membros/${member.id}`}
       className="card-interactive rounded-md p-4 flex items-center gap-3"
-      style={isSelf ? { borderColor: '#8637CC' } : undefined}
+      style={isSelf ? { borderColor: '#9966E0' } : undefined}
     >
       <Avatar user={member} size={38} fontSize={14} />
       <div className="w-28 sm:w-32 shrink-0 min-w-0">
@@ -244,7 +244,7 @@ function MiniCalendar({ byDay, onSelectDay }: { byDay: Record<string, CalItem[]>
           const dayColors = Array.from(new Set(dItems.map((it) => it.color)));
 
           let cellBg = 'transparent';
-          if (today) cellBg = 'rgba(134,55,204,0.12)';
+          if (today) cellBg = 'rgba(74,17,162,0.10)';
           else if (!inMonth) cellBg = dark ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.035)';
 
           return (
@@ -339,10 +339,7 @@ export function Dashboard() {
 
   if (loading) {
     return (
-      <Layout
-        title={`Olá, ${user.name}`}
-        subtitle={new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-      >
+      <Layout title="Dashboard">
         <Loading label="Carregando seu painel…" />
       </Layout>
     );
@@ -350,8 +347,7 @@ export function Dashboard() {
 
   return (
     <Layout
-      title={`Olá, ${user.name}`}
-      subtitle={new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      title="Dashboard"
     >
       <div className="space-y-4">
         {/* TOPO — mini calendário (esq) + 4 cards compactos (dir, 2×2) */}

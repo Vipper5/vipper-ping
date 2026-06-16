@@ -24,7 +24,7 @@ export function KpiCard({ label, value, trend, trendLabel, icon, onClick }: KpiC
           </span>
         )}
       </div>
-      <div className="mt-2 text-3xl font-bold font-display tracking-tight text-base-primary leading-none">{value}</div>
+      <div className="mt-2 text-3xl font-bold font-num tracking-tight text-base-primary leading-none">{value}</div>
       {trendLabel && trend && (
         <div className={`mt-1.5 flex items-center gap-1 text-xs font-mono ${trendColor}`}>
           <TrendIcon size={12} />
